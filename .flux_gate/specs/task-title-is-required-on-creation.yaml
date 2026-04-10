@@ -1,0 +1,12 @@
+title: Task title is required on creation
+description: >
+  The task API must reject task creation requests that are missing a title.
+  Empty strings, whitespace-only values, and absent fields must all be treated
+  as invalid. The response must indicate the validation failure clearly.
+acceptance_criteria:
+  - A POST with no title field is rejected with 422
+  - A POST with an empty string title is rejected with 422
+  - A POST with a whitespace-only title is rejected with 422
+  - A POST with a valid title succeeds with 201 and returns the created task
+target_endpoints:
+  - POST /tasks
