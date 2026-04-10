@@ -72,12 +72,27 @@ class Finding(FluxGateModel):
     evidence: list[str] = Field(default_factory=list)
 
 
+class FeatureSpec(FluxGateModel):
+    """Engineer-authored spec that drives the adversarial loop.
+
+    ``description`` is given to the Operator to guide probe scenario generation.
+    ``acceptance_criteria`` are given only to the HoldoutEvaluator — the Operator
+    never receives them, preserving the train/test separation.
+    """
+
+    title: str
+    description: str
+    acceptance_criteria: list[str]
+    target_endpoints: list[str] = Field(default_factory=list)
+
+
 class IterationSpec(FluxGateModel):
     index: int
     name: str
     goal: str
     operator_prompt: str
     adversary_prompt: str
+    feature_spec: FeatureSpec | None = None
 
 
 class IterationRecord(FluxGateModel):
@@ -85,6 +100,16 @@ class IterationRecord(FluxGateModel):
     scenarios: list[Scenario]
     execution_results: list[ExecutionResult]
     findings: list[Finding]
+
+
+class MergeGate(FluxGateModel):
+    """Binary merge decision derived from holdout pass rate."""
+
+    passed: bool
+    holdout_pass_rate: float
+    threshold: float
+    recommendation: Literal["merge", "block", "review"]
+    rationale: str
 
 
 class RiskReport(FluxGateModel):
@@ -96,10 +121,13 @@ class RiskReport(FluxGateModel):
     unexplored_surfaces: list[str]
     coverage: list[str]
     conclusion: str
+    merge_gate: MergeGate | None = None
 
 
 class FluxGateRun(FluxGateModel):
     system_under_test: str
     environment: str
+    feature_spec: FeatureSpec | None = None
     iterations: list[IterationRecord]
+    holdout_results: list[ExecutionResult] = Field(default_factory=list)
     risk_report: RiskReport

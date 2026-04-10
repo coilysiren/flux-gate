@@ -1,0 +1,13 @@
+title: Users cannot modify each other's tasks
+description: >
+  The task API must enforce resource ownership. A user who did not create a task
+  must not be able to modify or delete it, regardless of authentication status.
+  Ownership must be checked on every mutating operation.
+acceptance_criteria:
+  - A PATCH request by a non-owner is rejected with 403
+  - The task body is unchanged after an unauthorized PATCH attempt
+  - A GET by the owner after an unauthorized PATCH returns the original data
+target_endpoints:
+  - POST /tasks
+  - PATCH /tasks/{id}
+  - GET /tasks/{id}

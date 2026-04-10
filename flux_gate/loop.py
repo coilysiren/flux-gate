@@ -3,8 +3,17 @@ from __future__ import annotations
 from typing import Literal
 
 from .executor import DeterministicLocalExecutor
-from .models import Finding, FluxGateRun, IterationRecord, IterationSpec, RiskReport
-from .roles import Adversary, Operator
+from .models import (
+    ExecutionResult,
+    FeatureSpec,
+    Finding,
+    FluxGateRun,
+    IterationRecord,
+    IterationSpec,
+    MergeGate,
+    RiskReport,
+)
+from .roles import Adversary, HoldoutEvaluator, Operator
 
 
 def build_default_iteration_specs() -> list[IterationSpec]:
@@ -46,19 +55,31 @@ class FluxGateRunner:
         executor: DeterministicLocalExecutor,
         operator: Operator,
         adversary: Adversary,
+        holdout_evaluator: HoldoutEvaluator | None = None,
+        feature_spec: FeatureSpec | None = None,
+        gate_threshold: float = 0.90,
         system_under_test: str = "REST API",
         environment: str = "deterministic_local",
     ) -> None:
         self._executor = executor
         self._operator = operator
         self._adversary = adversary
+        self._holdout_evaluator = holdout_evaluator
+        self._feature_spec = feature_spec
+        self._gate_threshold = gate_threshold
         self._system_under_test = system_under_test
         self._environment = environment
 
     def run(self, iterations: list[IterationSpec] | None = None) -> FluxGateRun:
         specs = iterations or build_default_iteration_specs()
-        records: list[IterationRecord] = []
 
+        # Inject feature_spec into each iteration so the Operator can read
+        # spec.feature_spec.description — but never acceptance_criteria, which
+        # is only passed to the HoldoutEvaluator below.
+        if self._feature_spec:
+            specs = [s.model_copy(update={"feature_spec": self._feature_spec}) for s in specs]
+
+        records: list[IterationRecord] = []
         for spec in specs:
             scenarios = self._operator.generate_scenarios(spec, records)
             execution_results = [self._executor.run_scenario(scenario) for scenario in scenarios]
@@ -72,15 +93,28 @@ class FluxGateRunner:
                 )
             )
 
+        # Holdout scenarios are executed after the probe loop and their results
+        # are never fed back to the Operator or Adversary.
+        holdout_results: list[ExecutionResult] = []
+        if self._holdout_evaluator is not None and self._feature_spec is not None:
+            holdout_scenarios = self._holdout_evaluator.acceptance_scenarios(self._feature_spec)
+            holdout_results = [self._executor.run_scenario(s) for s in holdout_scenarios]
+
         return FluxGateRun(
             system_under_test=self._system_under_test,
             environment=self._environment,
+            feature_spec=self._feature_spec,
             iterations=records,
-            risk_report=_build_risk_report(records),
+            holdout_results=holdout_results,
+            risk_report=_build_risk_report(records, holdout_results, self._gate_threshold),
         )
 
 
-def _build_risk_report(records: list[IterationRecord]) -> RiskReport:
+def _build_risk_report(
+    records: list[IterationRecord],
+    holdout_results: list[ExecutionResult],
+    gate_threshold: float,
+) -> RiskReport:
     all_findings = [finding for record in records for finding in record.findings]
     coverage = sorted(
         {
@@ -98,6 +132,8 @@ def _build_risk_report(records: list[IterationRecord]) -> RiskReport:
     confidence_score = _confidence_score(all_findings)
     risk_level = _risk_level(all_findings)
 
+    merge_gate = _build_merge_gate(holdout_results, gate_threshold) if holdout_results else None
+
     return RiskReport(
         confidence_score=confidence_score,
         risk_level=risk_level,
@@ -107,6 +143,34 @@ def _build_risk_report(records: list[IterationRecord]) -> RiskReport:
         unexplored_surfaces=unexplored_surfaces,
         coverage=coverage,
         conclusion=_conclusion(risk_level, confirmed_failures),
+        merge_gate=merge_gate,
+    )
+
+
+def _build_merge_gate(holdout_results: list[ExecutionResult], threshold: float) -> MergeGate:
+    passing = sum(1 for r in holdout_results if all(a.passed for a in r.assertions))
+    pass_rate = passing / len(holdout_results)
+    passed = pass_rate >= threshold
+
+    if pass_rate >= threshold:
+        recommendation: Literal["merge", "block", "review"] = "merge"
+        rationale = f"Holdout pass rate {pass_rate:.0%} meets threshold {threshold:.0%}."
+    elif pass_rate >= threshold * 0.8:
+        recommendation = "review"
+        rationale = (
+            f"Holdout pass rate {pass_rate:.0%} is below threshold {threshold:.0%} "
+            "but within 20% — human review recommended."
+        )
+    else:
+        recommendation = "block"
+        rationale = f"Holdout pass rate {pass_rate:.0%} is below threshold {threshold:.0%}."
+
+    return MergeGate(
+        passed=passed,
+        holdout_pass_rate=pass_rate,
+        threshold=threshold,
+        recommendation=recommendation,
+        rationale=rationale,
     )
 
 
