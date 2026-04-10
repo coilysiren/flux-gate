@@ -15,6 +15,7 @@ from .roles import (
     DemoNaturalLanguageEvaluator,
     DemoNaturalLanguageHoldoutEvaluator,
     DemoOperator,
+    DemoSpecAssessor,
 )
 
 
@@ -52,7 +53,17 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.90,
         metavar="N",
-        help="Holdout pass rate required to recommend merge (default: 0.90)",
+        help="Holdout satisfaction score required to recommend merge (default: 0.90)",
+    )
+    parser.add_argument(
+        "--fail-fast-tier",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Stop after the first iteration at tier >= N that finds a critical issue "
+            "(default: disabled — all iterations always run)"
+        ),
     )
     return parser
 
@@ -75,8 +86,10 @@ def main() -> None:
         adversary=DemoAdversary(),
         nl_holdout_evaluator=DemoNaturalLanguageHoldoutEvaluator() if feature_spec else None,
         nl_evaluator=DemoNaturalLanguageEvaluator() if feature_spec else None,
+        spec_assessor=DemoSpecAssessor() if feature_spec else None,
         feature_spec=feature_spec,
         gate_threshold=args.threshold,
+        fail_fast_tier=args.fail_fast_tier,
         system_under_test=name,
         environment=args.env,
     )

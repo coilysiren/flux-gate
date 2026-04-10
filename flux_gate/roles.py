@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Protocol
 
 from .models import (
@@ -14,6 +15,7 @@ from .models import (
     NaturalLanguageScenario,
     Scenario,
     ScenarioStep,
+    SpecAssessment,
 )
 
 if TYPE_CHECKING:
@@ -64,6 +66,17 @@ class NaturalLanguageEvaluator(Protocol):
     def evaluate(
         self, scenario: NaturalLanguageScenario, executor: DeterministicLocalExecutor
     ) -> ExecutionResult: ...
+
+
+class SpecAssessor(Protocol):
+    """Evaluates a FeatureSpec for quality before the adversarial loop runs.
+
+    Returns a ``SpecAssessment`` with a quality score, issues, suggestions,
+    and a ``proceed`` flag. When ``proceed`` is ``False``, the runner skips
+    all iterations and returns a blocked merge gate.
+    """
+
+    def assess(self, spec: FeatureSpec) -> SpecAssessment: ...
 
 
 # Shared steps and assertions for the demo authorization scenario.
@@ -224,4 +237,52 @@ class DemoNaturalLanguageEvaluator:
             goal=scenario.verdict,
             steps=result.steps,
             assertions=[verdict_result],
+        )
+
+
+class DemoSpecAssessor:
+    """Heuristic spec assessor for use without an LLM.
+
+    Scores a FeatureSpec based on:
+    - acceptance criteria length  (short criteria score low)
+    - presence of specific HTTP status codes in criteria  (score high)
+    - presence of target_endpoints  (score high)
+
+    A ``quality_score`` below 0.5 sets ``proceed=False``, blocking the run.
+    """
+
+    _MIN_CRITERION_LEN = 20
+    _STATUS_CODE_RE = re.compile(r"\b[1-5]\d{2}\b")
+
+    def assess(self, spec: FeatureSpec) -> SpecAssessment:
+        issues: list[str] = []
+        suggestions: list[str] = []
+        score = 1.0
+
+        for criterion in spec.acceptance_criteria:
+            if len(criterion.strip()) < self._MIN_CRITERION_LEN:
+                issues.append(
+                    f"Criterion too vague (< {self._MIN_CRITERION_LEN} chars): {criterion!r}"
+                )
+                suggestions.append(
+                    "Specify expected status codes, fields, or observable behaviour."
+                )
+                score -= 0.3
+
+        if not spec.target_endpoints:
+            issues.append("No target_endpoints specified.")
+            suggestions.append("List the endpoints the spec covers (e.g. 'PATCH /tasks/{id}').")
+            score -= 0.2
+
+        has_status_code = any(self._STATUS_CODE_RE.search(c) for c in spec.acceptance_criteria)
+        if not has_status_code:
+            suggestions.append("Consider adding expected HTTP status codes to acceptance criteria.")
+            score -= 0.1
+
+        quality_score = round(max(0.0, score), 4)
+        return SpecAssessment(
+            quality_score=quality_score,
+            issues=issues,
+            suggestions=suggestions,
+            proceed=quality_score >= 0.5,
         )

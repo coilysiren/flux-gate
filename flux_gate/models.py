@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class FluxGateModel(BaseModel):
@@ -76,6 +76,18 @@ class ExecutionResult(FluxGateModel):
     steps: list[ExecutionStepResult]
     assertions: list[AssertionResult]
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def satisfaction_score(self) -> float:
+        """Fraction of assertions that passed, in [0.0, 1.0].
+
+        An empty assertion list (e.g. NL probe scenarios) returns 1.0.
+        Computed automatically from ``assertions``; never set manually.
+        """
+        if not self.assertions:
+            return 1.0
+        return round(sum(1 for a in self.assertions if a.passed) / len(self.assertions), 4)
+
 
 class Finding(FluxGateModel):
     issue: str
@@ -100,12 +112,27 @@ class FeatureSpec(FluxGateModel):
     target_endpoints: list[str] = Field(default_factory=list)
 
 
+class SpecAssessment(FluxGateModel):
+    """Result of a preflight quality check on a FeatureSpec.
+
+    When ``proceed`` is ``False``, the runner returns early without executing
+    any iterations. The ``issues`` list explains why the spec was rejected;
+    ``suggestions`` offers actionable fixes.
+    """
+
+    quality_score: float = Field(ge=0.0, le=1.0)
+    issues: list[str]
+    suggestions: list[str]
+    proceed: bool
+
+
 class IterationSpec(FluxGateModel):
     index: int
     name: str
     goal: str
     operator_prompt: str
     adversary_prompt: str
+    tier: int = 0
     feature_spec: FeatureSpec | None = None
 
 
@@ -117,10 +144,10 @@ class IterationRecord(FluxGateModel):
 
 
 class MergeGate(FluxGateModel):
-    """Binary merge decision derived from holdout pass rate."""
+    """Merge decision derived from holdout satisfaction score."""
 
     passed: bool
-    holdout_pass_rate: float
+    holdout_satisfaction_score: float
     threshold: float
     recommendation: Literal["merge", "block", "review"]
     rationale: str
@@ -144,4 +171,5 @@ class FluxGateRun(FluxGateModel):
     feature_spec: FeatureSpec | None = None
     iterations: list[IterationRecord]
     holdout_results: list[ExecutionResult] = Field(default_factory=list)
+    spec_assessment: SpecAssessment | None = None
     risk_report: RiskReport

@@ -17,6 +17,7 @@ from .models import (
     RiskReport,
     Scenario,
     ScenarioStep,
+    SpecAssessment,
 )
 from .roles import (
     DemoAdversary,
@@ -24,6 +25,7 @@ from .roles import (
     DemoNaturalLanguageEvaluator,
     DemoNaturalLanguageHoldoutEvaluator,
     DemoOperator,
+    DemoSpecAssessor,
 )
 
 __all__ = [
@@ -34,6 +36,7 @@ __all__ = [
     "DemoNaturalLanguageEvaluator",
     "DemoNaturalLanguageHoldoutEvaluator",
     "DemoOperator",
+    "DemoSpecAssessor",
     "DeterministicLocalExecutor",
     "ExecutionResult",
     "ExecutionStepResult",
@@ -52,5 +55,6 @@ __all__ = [
     "RiskReport",
     "Scenario",
     "ScenarioStep",
+    "SpecAssessment",
     "build_default_iteration_specs",
 ]

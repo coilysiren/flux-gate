@@ -12,6 +12,7 @@ from .models import (
     IterationSpec,
     MergeGate,
     RiskReport,
+    SpecAssessment,
 )
 from .roles import (
     Adversary,
@@ -19,6 +20,7 @@ from .roles import (
     NaturalLanguageEvaluator,
     NaturalLanguageHoldoutEvaluator,
     Operator,
+    SpecAssessor,
 )
 
 
@@ -28,6 +30,7 @@ def build_default_iteration_specs() -> list[IterationSpec]:
             index=1,
             name="broad_baseline",
             goal="broad_baseline",
+            tier=0,
             operator_prompt="Generate diverse CRUD and lifecycle scenarios.",
             adversary_prompt="Identify anomalies and weak coverage.",
         ),
@@ -35,6 +38,7 @@ def build_default_iteration_specs() -> list[IterationSpec]:
             index=2,
             name="boundary_and_invariants",
             goal="boundary_and_invariants",
+            tier=1,
             operator_prompt="Target edge cases, missing fields, and schema drift.",
             adversary_prompt="Escalate invariant violations.",
         ),
@@ -42,6 +46,7 @@ def build_default_iteration_specs() -> list[IterationSpec]:
             index=3,
             name="adversarial_misuse",
             goal="adversarial_misuse",
+            tier=2,
             operator_prompt="Simulate auth violations and invalid transitions.",
             adversary_prompt="Identify security and logic failures.",
         ),
@@ -49,6 +54,7 @@ def build_default_iteration_specs() -> list[IterationSpec]:
             index=4,
             name="targeted_followup",
             goal="targeted_followup",
+            tier=3,
             operator_prompt="Focus only on suspicious areas.",
             adversary_prompt="Finalize the failure model.",
         ),
@@ -64,8 +70,10 @@ class FluxGateRunner:
         holdout_evaluator: HoldoutEvaluator | None = None,
         nl_holdout_evaluator: NaturalLanguageHoldoutEvaluator | None = None,
         nl_evaluator: NaturalLanguageEvaluator | None = None,
+        spec_assessor: SpecAssessor | None = None,
         feature_spec: FeatureSpec | None = None,
         gate_threshold: float = 0.90,
+        fail_fast_tier: int | None = None,
         system_under_test: str = "REST API",
         environment: str = "deterministic_local",
     ) -> None:
@@ -75,13 +83,22 @@ class FluxGateRunner:
         self._holdout_evaluator = holdout_evaluator
         self._nl_holdout_evaluator = nl_holdout_evaluator
         self._nl_evaluator = nl_evaluator
+        self._spec_assessor = spec_assessor
         self._feature_spec = feature_spec
         self._gate_threshold = gate_threshold
+        self._fail_fast_tier = fail_fast_tier
         self._system_under_test = system_under_test
         self._environment = environment
 
     def run(self, iterations: list[IterationSpec] | None = None) -> FluxGateRun:
         specs = iterations or build_default_iteration_specs()
+
+        # Preflight: assess spec quality before running any iterations.
+        spec_assessment: SpecAssessment | None = None
+        if self._spec_assessor is not None and self._feature_spec is not None:
+            spec_assessment = self._spec_assessor.assess(self._feature_spec)
+            if not spec_assessment.proceed:
+                return self._blocked_by_preflight(spec_assessment)
 
         # Inject feature_spec into each iteration so the Operator can read
         # spec.feature_spec.description — but never acceptance_criteria, which
@@ -103,6 +120,12 @@ class FluxGateRunner:
                 )
             )
 
+            # Fail-fast: stop as soon as a critical finding appears in a tier
+            # at or above the configured threshold tier.
+            if self._fail_fast_tier is not None and spec.tier >= self._fail_fast_tier:
+                if any(f.severity == "critical" for f in findings):
+                    break
+
         # Holdout scenarios are executed after the probe loop and their results
         # are never fed back to the Operator or Adversary.
         holdout_results: list[ExecutionResult] = []
@@ -122,7 +145,39 @@ class FluxGateRunner:
             feature_spec=self._feature_spec,
             iterations=records,
             holdout_results=holdout_results,
+            spec_assessment=spec_assessment,
             risk_report=_build_risk_report(records, holdout_results, self._gate_threshold),
+        )
+
+    def _blocked_by_preflight(self, assessment: SpecAssessment) -> FluxGateRun:
+        rationale = (
+            f"Spec quality score {assessment.quality_score:.0%} is too low to proceed. "
+            f"Issues: {'; '.join(assessment.issues) or 'none'}."
+        )
+        return FluxGateRun(
+            system_under_test=self._system_under_test,
+            environment=self._environment,
+            feature_spec=self._feature_spec,
+            iterations=[],
+            holdout_results=[],
+            spec_assessment=assessment,
+            risk_report=RiskReport(
+                confidence_score=0.0,
+                risk_level="low",
+                summary=["Run blocked by preflight spec assessment."],
+                confirmed_failures=[],
+                suspicious_patterns=[],
+                unexplored_surfaces=[],
+                coverage=[],
+                conclusion="Run blocked: spec quality score below threshold.",
+                merge_gate=MergeGate(
+                    passed=False,
+                    holdout_satisfaction_score=0.0,
+                    threshold=self._gate_threshold,
+                    recommendation="block",
+                    rationale=rationale,
+                ),
+            ),
         )
 
 
@@ -164,26 +219,30 @@ def _build_risk_report(
 
 
 def _build_merge_gate(holdout_results: list[ExecutionResult], threshold: float) -> MergeGate:
-    passing = sum(1 for r in holdout_results if all(a.passed for a in r.assertions))
-    pass_rate = passing / len(holdout_results)
-    passed = pass_rate >= threshold
+    satisfaction_score = sum(r.satisfaction_score for r in holdout_results) / len(holdout_results)
+    passed = satisfaction_score >= threshold
 
-    if pass_rate >= threshold:
+    if satisfaction_score >= threshold:
         recommendation: Literal["merge", "block", "review"] = "merge"
-        rationale = f"Holdout pass rate {pass_rate:.0%} meets threshold {threshold:.0%}."
-    elif pass_rate >= threshold * 0.8:
+        rationale = (
+            f"Holdout satisfaction score {satisfaction_score:.0%} meets threshold {threshold:.0%}."
+        )
+    elif satisfaction_score >= threshold * 0.8:
         recommendation = "review"
         rationale = (
-            f"Holdout pass rate {pass_rate:.0%} is below threshold {threshold:.0%} "
-            "but within 20% — human review recommended."
+            f"Holdout satisfaction score {satisfaction_score:.0%} is below threshold "
+            f"{threshold:.0%} but within 20% — human review recommended."
         )
     else:
         recommendation = "block"
-        rationale = f"Holdout pass rate {pass_rate:.0%} is below threshold {threshold:.0%}."
+        rationale = (
+            f"Holdout satisfaction score {satisfaction_score:.0%} "
+            f"is below threshold {threshold:.0%}."
+        )
 
     return MergeGate(
         passed=passed,
-        holdout_pass_rate=pass_rate,
+        holdout_satisfaction_score=satisfaction_score,
         threshold=threshold,
         recommendation=recommendation,
         rationale=rationale,
