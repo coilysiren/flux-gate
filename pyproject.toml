@@ -4,3 +4,6 @@ version = "0.1.0"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["pydantic>=2.12.5", "pytest>=9.0.3", "requests>=2.33.1"]
+
+[tool.pytest.ini_options]
+markers = ["docker: requires Docker and docker compose (deselect with -m 'not docker')"]

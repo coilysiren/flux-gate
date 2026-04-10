@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    command: uv run python main.py
+
+  test:
+    build: .
+    command: uv run pytest -m "not docker"
