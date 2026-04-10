@@ -66,8 +66,6 @@ flux-gate http://localhost:8000 --spec /path/to/spec.yaml --actors /path/to/acto
 Output is YAML:
 
 ```yaml
-system_under_test: Task API (staging)
-environment: local
 risk_report:
   confidence_score: 0.06
   risk_level: critical
@@ -190,13 +188,31 @@ Together, they perform a form of guided adversarial search over the space of pos
 
 ## Prior Art
 
-These projects informed Flux Gate's design:
+These projects informed Flux Gate's design.
 
-- **[StrongDM Software Factory](https://factory.strongdm.ai/)** — Production dark factory. Introduced "satisfaction metrics" (probabilistic, not boolean), the Digital Twin Universe (behavioral clones of third-party services), and the principle that scenarios live outside the codebase to prevent reward-hacking.
+### [StrongDM Software Factory](https://factory.strongdm.ai/)
 
-- **[OctopusGarden](https://github.com/foundatron/octopusgarden)** — Open-source autonomous development platform. Introduced the attractor loop (iterative convergence to a satisfaction threshold), stratified scenario difficulty, stall recovery via high-temperature "wonder" phases, and model escalation (cheap → premium after non-improving iterations).
+Production dark factory — code is written and reviewed entirely by agents.
 
-- **[Fabro](https://github.com/fabro-sh/fabro)** — Open-source dark factory orchestrator. Introduced workflow-as-graph (Graphviz DOT, version-controlled), multi-model routing via CSS-like stylesheets, human-in-the-loop hexagon gates, and per-stage Git checkpointing.
+Key architectural ideas adopted: **satisfaction metrics** (probabilistic 0–1 scores, not boolean pass/fail) and the principle that **scenarios live outside the codebase** to prevent reward-hacking (Flux Gate uses `.flux_gate/spec.yaml`).
+
+Architectural divergence: the Software Factory maintains a Digital Twin Universe — behavioral clones of third-party services that agents test against without hitting real infrastructure. Flux Gate has no twin layer; it requires a running HTTP server and sends real requests. The Software Factory is also a full code-generation pipeline; Flux Gate is only a gate. It verifies code already written, it does not write code.
+
+### [OctopusGarden](https://github.com/foundatron/octopusgarden)
+
+Open-source autonomous development platform with a convergence-based loop.
+
+Key architectural ideas adopted: **stratified scenario difficulty** (Flux Gate's four tiers: baseline → boundary → adversarial → targeted) and the **attractor loop** concept — iterating until a threshold is met (Flux Gate's `--threshold` flag).
+
+Architectural divergence: OctopusGarden's loop is dynamic — it runs until satisfaction converges, with stall recovery via high-temperature "wonder" phases and model escalation (cheap model first, premium model after non-improving iterations). Flux Gate's loop is fixed-depth: four tiers, one pass. There is no stall detection, no wonder phase, and no model escalation. The tradeoff is predictability and cost over adaptive thoroughness.
+
+### [Fabro](https://github.com/fabro-sh/fabro)
+
+Open-source dark factory orchestrator with a graph-based workflow engine.
+
+Key architectural ideas adopted: **human-in-the-loop gates** — Fabro's hexagon gates are checkpoints where a human can block promotion. Flux Gate's `MergeGate` plays the same role, but the decision is made by the Adversary LLM rather than a human.
+
+Architectural divergence: Fabro models workflows as directed graphs (Graphviz DOT files, version-controlled alongside code). Flux Gate has no graph engine — its pipeline is a fixed linear sequence of iterations. Fabro also supports multi-model routing via CSS-like stylesheets and per-stage Git checkpointing. Flux Gate has neither: model assignment is static (one Operator, one Adversary) and there is no checkpointing between iterations.
 
 ## What Makes This Different
 
