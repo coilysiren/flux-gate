@@ -186,6 +186,22 @@ The Adversary assumes "This system is broken. I just haven't proven it yet."
 
 Together, they perform a form of guided adversarial search over the space of possible failures.
 
+## What Makes This Different
+
+Flux Gate is not:
+
+* a test runner
+* a code reviewer
+* a fuzzing tool
+
+It is an adversarial inference engine for software correctness.
+
+It combines:
+
+* dynamic scenario generation (like red teaming)
+* execution grounding (like CI)
+* adversarial refinement (like security testing)
+
 ## Prior Art
 
 These projects informed Flux Gate's design.
@@ -213,19 +229,3 @@ Open-source dark factory orchestrator with a graph-based workflow engine.
 Key architectural ideas adopted: **human-in-the-loop gates** — Fabro's hexagon gates are checkpoints where a human can block promotion. Flux Gate's `MergeGate` plays the same role, but the decision is made by the Adversary LLM rather than a human.
 
 Architectural divergence: Fabro models workflows as directed graphs (Graphviz DOT files, version-controlled alongside code). Flux Gate has no graph engine — its pipeline is a fixed linear sequence of iterations. Fabro also supports multi-model routing via CSS-like stylesheets and per-stage Git checkpointing. Flux Gate has neither: model assignment is static (one Operator, one Adversary) and there is no checkpointing between iterations.
-
-## What Makes This Different
-
-Flux Gate is not:
-
-* a test runner
-* a code reviewer
-* a fuzzing tool
-
-It is an adversarial inference engine for software correctness.
-
-It combines:
-
-* dynamic scenario generation (like red teaming)
-* execution grounding (like CI)
-* adversarial refinement (like security testing)
