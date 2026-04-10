@@ -13,14 +13,15 @@ from .executor import DeterministicLocalExecutor, HttpExecutor
 from .llm import create_adversary, create_operator
 from .loop import FluxGateRunner
 from .models import FeatureSpec
-from .roles import (
-    DemoSpecAssessor,
-)
+from .roles import DemoSpecAssessor
 
 _ENV_OPERATOR_TYPE = "FLUX_GATE_OPERATOR_TYPE"
 _ENV_OPERATOR_KEY = "FLUX_GATE_OPERATOR_KEY"
 _ENV_ADVERSARY_TYPE = "FLUX_GATE_ADVERSARY_TYPE"
 _ENV_ADVERSARY_KEY = "FLUX_GATE_ADVERSARY_KEY"
+
+_DEFAULT_SPEC = ".flux_gate/spec.yaml"
+_DEFAULT_ACTORS = ".flux_gate/actors.yaml"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -50,13 +51,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--spec",
         default=None,
         metavar="FILE",
-        help="Path to a FeatureSpec YAML file; enables holdout evaluation and merge gate",
+        help=(f"Path to a FeatureSpec YAML file (default: {_DEFAULT_SPEC} if it exists)"),
     )
     parser.add_argument(
         "--actors",
         default=None,
         metavar="FILE",
-        help="Path to an actors YAML file defining per-actor authentication credentials",
+        help=(
+            f"Path to an actors YAML file defining per-actor authentication "
+            f"(default: {_DEFAULT_ACTORS} if it exists)"
+        ),
     )
     parser.add_argument(
         "--threshold",
@@ -76,6 +80,22 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     return parser
+
+
+def _load_file(explicit: str | None, default: str) -> Path | None:
+    """Return the path to use for a config file, or None if it should be skipped.
+
+    If an explicit path was given and does not exist, exits 1 with an error.
+    If no explicit path was given, silently skips when the default is absent.
+    """
+    if explicit is not None:
+        p = Path(explicit)
+        if not p.exists():
+            print(f"error: file not found: {explicit}", file=sys.stderr)
+            sys.exit(1)
+        return p
+    p = Path(default)
+    return p if p.exists() else None
 
 
 def main() -> None:
@@ -114,14 +134,14 @@ def main() -> None:
     name: str = args.name or urlparse(args.url).netloc or args.url
 
     feature_spec: FeatureSpec | None = None
-    if args.spec:
-        raw = yaml.safe_load(Path(args.spec).read_text())
-        feature_spec = FeatureSpec(**raw)
+    spec_path = _load_file(args.spec, _DEFAULT_SPEC)
+    if spec_path is not None:
+        feature_spec = FeatureSpec(**yaml.safe_load(spec_path.read_text()))
 
     actor_headers: dict[str, dict[str, str]] = {}
-    if args.actors:
-        actors_raw = yaml.safe_load(Path(args.actors).read_text())
-        actor_headers = to_actor_headers(ActorsConfig(**actors_raw))
+    actors_path = _load_file(args.actors, _DEFAULT_ACTORS)
+    if actors_path is not None:
+        actor_headers = to_actor_headers(ActorsConfig(**yaml.safe_load(actors_path.read_text())))
 
     executor = DeterministicLocalExecutor(HttpExecutor(args.url, actor_headers=actor_headers))
     runner = FluxGateRunner(

@@ -10,7 +10,7 @@ services:
 
   demo:
     build: .
-    command: uv run flux-gate http://api:8000 --name "Demo Task API" --spec specs/task-ownership.yaml
+    command: uv run flux-gate http://api:8000 --name "Demo Task API"
     depends_on:
       api:
         condition: service_healthy

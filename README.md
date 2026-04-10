@@ -61,8 +61,8 @@ flux-gate <url> [--name NAME] [--env ENV] [--spec FILE] [--actors FILE] [--thres
 
 ```bash
 flux-gate http://localhost:8000
-flux-gate http://localhost:8000 --name "Task API" --env staging --spec specs/task-ownership.yaml
-flux-gate http://localhost:8000 --spec specs/task-ownership.yaml --actors config/actors.yaml
+flux-gate http://localhost:8000 --name "Task API" --env staging
+flux-gate http://localhost:8000 --spec /path/to/spec.yaml --actors /path/to/actors.yaml
 ```
 
 Output is YAML:
@@ -84,6 +84,21 @@ risk_report:
     without remediation.
 ```
 
+### Project config directory
+
+Place your Flux Gate config files in a `.flux_gate/` directory at the root of your project.
+The CLI discovers them automatically — no flags needed for the common case:
+
+```
+your-project/
+├── .flux_gate/
+│   ├── spec.yaml      # FeatureSpec — loaded automatically
+│   └── actors.yaml    # Actor auth — loaded automatically if present
+└── ...
+```
+
+Override either path with `--spec FILE` or `--actors FILE`.
+
 ### Feature spec
 
 A FeatureSpec tells Flux Gate what you're testing and defines the holdout acceptance criteria.
@@ -91,7 +106,7 @@ Acceptance criteria are never shown to the Operator — only to the holdout eval
 the train/test separation.
 
 ```yaml
-# specs/task-ownership.yaml
+# .flux_gate/spec.yaml
 title: Users cannot modify each other's tasks
 description: >
   The task API must enforce resource ownership. A user who did not create
@@ -108,27 +123,28 @@ target_endpoints:
 
 ### Actor authentication
 
-Create an actors YAML file to provide per-actor credentials. Actors omitted from the file
-fall back to the default `X-Actor: <name>` header.
+Create `.flux_gate/actors.yaml` to provide per-actor credentials. Secret values are
+never stored in the file — each entry names an environment variable that holds the
+actual credential. Actors omitted from the file fall back to the default `X-Actor: <name>` header.
 
 ```yaml
-# config/actors.yaml
+# .flux_gate/actors.yaml
 actors:
   alice:
     type: bearer
-    token: "eyJhbGciOiJIUzI1NiJ9..."
+    token_env: ALICE_TOKEN       # export ALICE_TOKEN=eyJ...
   bob:
     type: api_key
     header: X-API-Key
-    key: "sk-bob-secret"
+    key_env: BOB_API_KEY         # export BOB_API_KEY=sk-...
 ```
 
 Supported authentication types:
 
 | Type | Fields | Header sent |
 |---|---|---|
-| `bearer` | `token` | `Authorization: Bearer <token>` |
-| `api_key` | `header`, `key` | `<header>: <key>` |
+| `bearer` | `token_env` | `Authorization: Bearer <$token_env>` |
+| `api_key` | `header`, `key_env` | `<header>: <$key_env>` |
 
 ---
 
