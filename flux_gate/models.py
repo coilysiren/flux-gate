@@ -41,6 +41,20 @@ class Scenario(FluxGateModel):
     assertions: list[Assertion] = Field(default_factory=list)
 
 
+class NaturalLanguageScenario(FluxGateModel):
+    """A scenario described in plain English; interpreted at runtime by a
+    ``NaturalLanguageEvaluator`` rather than pre-defined as structured steps.
+
+    No glue code, no schema maintenance — the evaluator plans its own request
+    sequence from ``description`` and judges the outcome against ``verdict``.
+    """
+
+    name: str
+    description: str
+    actors: list[str]
+    verdict: str
+
+
 class ExecutionStepResult(FluxGateModel):
     step_index: int
     actor: str
@@ -50,7 +64,7 @@ class ExecutionStepResult(FluxGateModel):
 
 class AssertionResult(FluxGateModel):
     name: str
-    kind: Literal["status_code", "invariant"]
+    kind: Literal["status_code", "invariant", "verdict"]
     passed: bool
     detail: str
 

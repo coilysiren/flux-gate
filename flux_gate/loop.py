@@ -13,7 +13,13 @@ from .models import (
     MergeGate,
     RiskReport,
 )
-from .roles import Adversary, HoldoutEvaluator, Operator
+from .roles import (
+    Adversary,
+    HoldoutEvaluator,
+    NaturalLanguageEvaluator,
+    NaturalLanguageHoldoutEvaluator,
+    Operator,
+)
 
 
 def build_default_iteration_specs() -> list[IterationSpec]:
@@ -56,6 +62,8 @@ class FluxGateRunner:
         operator: Operator,
         adversary: Adversary,
         holdout_evaluator: HoldoutEvaluator | None = None,
+        nl_holdout_evaluator: NaturalLanguageHoldoutEvaluator | None = None,
+        nl_evaluator: NaturalLanguageEvaluator | None = None,
         feature_spec: FeatureSpec | None = None,
         gate_threshold: float = 0.90,
         system_under_test: str = "REST API",
@@ -65,6 +73,8 @@ class FluxGateRunner:
         self._operator = operator
         self._adversary = adversary
         self._holdout_evaluator = holdout_evaluator
+        self._nl_holdout_evaluator = nl_holdout_evaluator
+        self._nl_evaluator = nl_evaluator
         self._feature_spec = feature_spec
         self._gate_threshold = gate_threshold
         self._system_under_test = system_under_test
@@ -75,7 +85,7 @@ class FluxGateRunner:
 
         # Inject feature_spec into each iteration so the Operator can read
         # spec.feature_spec.description — but never acceptance_criteria, which
-        # is only passed to the HoldoutEvaluator below.
+        # is only passed to the holdout evaluators below.
         if self._feature_spec:
             specs = [s.model_copy(update={"feature_spec": self._feature_spec}) for s in specs]
 
@@ -96,9 +106,15 @@ class FluxGateRunner:
         # Holdout scenarios are executed after the probe loop and their results
         # are never fed back to the Operator or Adversary.
         holdout_results: list[ExecutionResult] = []
-        if self._holdout_evaluator is not None and self._feature_spec is not None:
-            holdout_scenarios = self._holdout_evaluator.acceptance_scenarios(self._feature_spec)
-            holdout_results = [self._executor.run_scenario(s) for s in holdout_scenarios]
+        if self._feature_spec is not None:
+            if self._holdout_evaluator is not None:
+                for scenario in self._holdout_evaluator.acceptance_scenarios(self._feature_spec):
+                    holdout_results.append(self._executor.run_scenario(scenario))
+
+            if self._nl_holdout_evaluator is not None and self._nl_evaluator is not None:
+                nl_scenarios = self._nl_holdout_evaluator.acceptance_scenarios(self._feature_spec)
+                for nl_scenario in nl_scenarios:
+                    holdout_results.append(self._nl_evaluator.evaluate(nl_scenario, self._executor))
 
         return FluxGateRun(
             system_under_test=self._system_under_test,

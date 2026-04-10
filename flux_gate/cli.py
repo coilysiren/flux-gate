@@ -10,7 +10,12 @@ import yaml
 from .executor import DeterministicLocalExecutor, HttpExecutor
 from .loop import FluxGateRunner
 from .models import FeatureSpec
-from .roles import DemoAdversary, DemoHoldoutEvaluator, DemoOperator
+from .roles import (
+    DemoAdversary,
+    DemoNaturalLanguageEvaluator,
+    DemoNaturalLanguageHoldoutEvaluator,
+    DemoOperator,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -68,7 +73,8 @@ def main() -> None:
         executor=executor,
         operator=DemoOperator(),
         adversary=DemoAdversary(),
-        holdout_evaluator=DemoHoldoutEvaluator() if feature_spec else None,
+        nl_holdout_evaluator=DemoNaturalLanguageHoldoutEvaluator() if feature_spec else None,
+        nl_evaluator=DemoNaturalLanguageEvaluator() if feature_spec else None,
         feature_spec=feature_spec,
         gate_threshold=args.threshold,
         system_under_test=name,

@@ -1,6 +1,8 @@
 from flux_gate import (
     DemoAdversary,
     DemoHoldoutEvaluator,
+    DemoNaturalLanguageEvaluator,
+    DemoNaturalLanguageHoldoutEvaluator,
     DemoOperator,
     DeterministicLocalExecutor,
     FeatureSpec,
@@ -38,6 +40,33 @@ def test_demo_scenario_surfaces_authz_failure() -> None:
     assert result.steps[1].response.status_code == 200
     assert result.assertions[0].passed is False
     assert result.assertions[1].passed is False
+
+
+def test_nl_holdout_gate_blocks_failing_api() -> None:
+    """NaturalLanguageScenario path: criteria are parsed from the spec at runtime."""
+    spec = FeatureSpec(
+        title="Users cannot modify each other's tasks",
+        description="The task API must enforce resource ownership.",
+        acceptance_criteria=["A PATCH by a non-owner is rejected with 403"],
+        target_endpoints=["PATCH /tasks/{id}"],
+    )
+
+    runner = FluxGateRunner(
+        executor=DeterministicLocalExecutor(InMemoryTaskAPI()),
+        operator=DemoOperator(),
+        adversary=DemoAdversary(),
+        nl_holdout_evaluator=DemoNaturalLanguageHoldoutEvaluator(),
+        nl_evaluator=DemoNaturalLanguageEvaluator(),
+        feature_spec=spec,
+        gate_threshold=0.90,
+    )
+
+    run = runner.run()
+
+    assert len(run.holdout_results) == 1
+    assert run.holdout_results[0].assertions[0].kind == "verdict"
+    assert run.risk_report.merge_gate is not None
+    assert run.risk_report.merge_gate.recommendation == "block"
 
 
 def test_holdout_gate_blocks_failing_api() -> None:

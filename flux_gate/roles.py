@@ -1,18 +1,23 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .models import (
     Assertion,
+    AssertionResult,
     ExecutionResult,
     FeatureSpec,
     Finding,
     HttpRequest,
     IterationRecord,
     IterationSpec,
+    NaturalLanguageScenario,
     Scenario,
     ScenarioStep,
 )
+
+if TYPE_CHECKING:
+    from .executor import DeterministicLocalExecutor
 
 
 class Operator(Protocol):
@@ -28,17 +33,40 @@ class Adversary(Protocol):
 
 
 class HoldoutEvaluator(Protocol):
-    """Produces acceptance scenarios from a FeatureSpec.
+    """Returns structured acceptance scenarios from a FeatureSpec.
 
     The Operator never receives these scenarios or their results — this preserves
-    the train/test separation described in the dark factory pattern.  A real
-    implementation calls an LLM with ``spec.acceptance_criteria``; the demo
-    implementation returns a fixed scenario regardless of spec content.
+    the train/test separation described in the dark factory pattern.
     """
 
     def acceptance_scenarios(self, spec: FeatureSpec) -> list[Scenario]: ...
 
 
+class NaturalLanguageHoldoutEvaluator(Protocol):
+    """Converts FeatureSpec acceptance criteria into NaturalLanguageScenario objects.
+
+    Each criterion becomes a scenario described in plain English.  The Operator
+    never sees these criteria.  A ``NaturalLanguageEvaluator`` interprets them
+    at execution time without glue code.
+    """
+
+    def acceptance_scenarios(self, spec: FeatureSpec) -> list[NaturalLanguageScenario]: ...
+
+
+class NaturalLanguageEvaluator(Protocol):
+    """Interprets a NaturalLanguageScenario against a live system under test.
+
+    A real implementation calls an LLM to plan requests from ``scenario.description``
+    and judge the outcome against ``scenario.verdict``.  The demo implementation
+    uses pattern-matching as a stand-in.
+    """
+
+    def evaluate(
+        self, scenario: NaturalLanguageScenario, executor: DeterministicLocalExecutor
+    ) -> ExecutionResult: ...
+
+
+# Shared steps and assertions for the demo authorization scenario.
 _AUTHZ_STEPS = [
     ScenarioStep(
         actor="userA",
@@ -120,13 +148,7 @@ class DemoAdversary:
 
 
 class DemoHoldoutEvaluator:
-    """Returns the cross-user authorization scenario as a holdout acceptance check.
-
-    The Operator generates the same scenario as a probe — in the demo this is
-    intentional, to show that the holdout layer independently catches the seeded
-    authorization flaw.  A real evaluator would derive scenarios from
-    ``spec.acceptance_criteria`` via an LLM.
-    """
+    """Returns the cross-user authorization scenario as a structured holdout check."""
 
     def acceptance_scenarios(self, spec: FeatureSpec) -> list[Scenario]:
         return [
@@ -138,3 +160,68 @@ class DemoHoldoutEvaluator:
                 assertions=_AUTHZ_ASSERTIONS,
             )
         ]
+
+
+class DemoNaturalLanguageHoldoutEvaluator:
+    """Converts each acceptance criterion into a NaturalLanguageScenario.
+
+    A real implementation would parse the criterion with an LLM.  The demo
+    passes the criterion text verbatim as the ``verdict``.
+    """
+
+    def acceptance_scenarios(self, spec: FeatureSpec) -> list[NaturalLanguageScenario]:
+        return [
+            NaturalLanguageScenario(
+                name=f"criterion_{i}",
+                description=spec.description,
+                actors=["userA", "userB"],
+                verdict=criterion,
+            )
+            for i, criterion in enumerate(spec.acceptance_criteria)
+        ]
+
+
+class DemoNaturalLanguageEvaluator:
+    """Interprets NaturalLanguageScenarios via pattern-matching (no LLM required).
+
+    For each scenario, it executes the hardcoded authorization test steps and
+    judges the outcome by searching for expected status codes in the verdict text.
+    A real implementation would use an LLM to plan steps from ``scenario.description``
+    and reason about the response against ``scenario.verdict``.
+    """
+
+    def evaluate(
+        self, scenario: NaturalLanguageScenario, executor: DeterministicLocalExecutor
+    ) -> ExecutionResult:
+        probe = Scenario(
+            name=f"nl_{scenario.name}",
+            category="nl_evaluation",
+            goal=scenario.verdict,
+            steps=_AUTHZ_STEPS,
+            assertions=[],
+        )
+        result = executor.run_scenario(probe)
+
+        # Verdict judgment: extract expected status code from verdict text.
+        step2_status = result.steps[1].response.status_code
+        if "403" in scenario.verdict:
+            passed = step2_status == 403
+            detail = f"verdict requires 403; step 2 returned {step2_status}"
+        else:
+            passed = all(s.response.status_code < 500 for s in result.steps)
+            detail = "no server errors — verdict satisfied by default"
+
+        verdict_result = AssertionResult(
+            name="nl_verdict",
+            kind="verdict",
+            passed=passed,
+            detail=detail,
+        )
+
+        return ExecutionResult(
+            scenario_name=scenario.name,
+            category="nl_evaluation",
+            goal=scenario.verdict,
+            steps=result.steps,
+            assertions=[verdict_result],
+        )

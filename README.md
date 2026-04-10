@@ -326,6 +326,16 @@ risk_report:
     not safe for production deployment.
 ```
 
+## Prior Art
+
+These projects informed Flux Gate's design:
+
+- **[StrongDM Software Factory](https://factory.strongdm.ai/)** — Production dark factory. Introduced "satisfaction metrics" (probabilistic, not boolean), the Digital Twin Universe (behavioral clones of third-party services), and the principle that scenarios live outside the codebase to prevent reward-hacking.
+
+- **[OctopusGarden](https://github.com/foundatron/octopusgarden)** — Open-source autonomous development platform. Introduced the attractor loop (iterative convergence to a satisfaction threshold), stratified scenario difficulty, stall recovery via high-temperature "wonder" phases, and model escalation (cheap → premium after non-improving iterations).
+
+- **[Fabro](https://github.com/fabro-sh/fabro)** — Open-source dark factory orchestrator. Introduced workflow-as-graph (Graphviz DOT, version-controlled), multi-model routing via CSS-like stylesheets, human-in-the-loop hexagon gates, and per-stage Git checkpointing.
+
 ## What Makes This Different
 
 Flux Gate is not:

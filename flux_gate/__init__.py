@@ -13,17 +13,26 @@ from .models import (
     IterationRecord,
     IterationSpec,
     MergeGate,
+    NaturalLanguageScenario,
     RiskReport,
     Scenario,
     ScenarioStep,
 )
-from .roles import DemoAdversary, DemoHoldoutEvaluator, DemoOperator
+from .roles import (
+    DemoAdversary,
+    DemoHoldoutEvaluator,
+    DemoNaturalLanguageEvaluator,
+    DemoNaturalLanguageHoldoutEvaluator,
+    DemoOperator,
+)
 
 __all__ = [
     "Assertion",
     "AssertionResult",
     "DemoAdversary",
     "DemoHoldoutEvaluator",
+    "DemoNaturalLanguageEvaluator",
+    "DemoNaturalLanguageHoldoutEvaluator",
     "DemoOperator",
     "DeterministicLocalExecutor",
     "ExecutionResult",
@@ -39,6 +48,7 @@ __all__ = [
     "IterationRecord",
     "IterationSpec",
     "MergeGate",
+    "NaturalLanguageScenario",
     "RiskReport",
     "Scenario",
     "ScenarioStep",
