@@ -11,9 +11,9 @@ Developer reference for agents and humans working on this codebase.
 
 After any code change:
 
-1. Run `uv run pytest -m "not docker"` — all tests must pass
+1. Run `docker compose run --rm test` — all tests must pass
 2. Run `uv run ruff check . && uv run ruff format --check .` — no lint or format errors
-3. Run `uv run mypy flux_gate tests main.py --strict` — no type errors
+3. Run `uv run mypy flux_gate tests main.py demo_api --strict` — no type errors
 
 Pre-commit enforces rules 2 and 3 automatically on `git commit`.
 
@@ -24,3 +24,4 @@ Pre-commit enforces rules 2 and 3 automatically on `git commit`.
 - `extra="forbid"` on all models: unknown fields raise at construction time.
 - The 4-iteration loop is fixed in `loop.py:build_default_iteration_specs()`.
 - `InMemoryTaskAPI` contains an intentional authorization flaw — tests rely on it.
+- `demo_api/server.py` exposes `InMemoryTaskAPI` over HTTP; used by `docker compose run --rm demo`.

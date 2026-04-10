@@ -2,27 +2,28 @@
 
 Flux Gate is a two-agent adversarial loop that infers software correctness by observing how code behaves under sustained, targeted attack, and is designed as quality control for a dark factory environment.
 
+## Quick start
+
+```bash
+git clone git@github.com:coilysiren/flux-gate.git
+cd flux-gate
+docker compose run --rm demo
+```
+
+That starts the demo API and runs `flux-gate` against it.
+
 ## Installation
+
+To use Flux Gate against your own API:
 
 ```bash
 pip install flux-gate
+# or: uv add flux-gate
 ```
 
-Or with [uv](https://docs.astral.sh/uv/):
+Then point it at your locally-running service:
 
 ```bash
-uv add flux-gate
-```
-
-## Quick start
-
-Start your API, then point Flux Gate at it:
-
-```bash
-# start your API in one terminal
-python myapp.py  # listening on http://localhost:8000
-
-# run flux-gate in another
 flux-gate http://localhost:8000
 ```
 

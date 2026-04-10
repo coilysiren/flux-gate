@@ -4,39 +4,39 @@
 
 | Tool | Version | Install |
 |---|---|---|
-| Python | 3.13+ | `pyenv install 3.13` |
-| uv | latest | `brew install uv` |
 | Docker | any | [docker.com](https://docker.com) |
+| uv | latest | `brew install uv` (for local dev / pre-commit) |
 
 ## Setup
 
 ```bash
 git clone git@github.com:coilysiren/flux-gate.git
 cd flux-gate
-uv sync --frozen          # install all deps into .venv
-uv run pre-commit install # install git hooks
+docker compose build
+uv run pre-commit install  # install git hooks
 ```
 
 ## Running the demo
 
 ```bash
-uv run python main.py
+docker compose run --rm demo
 ```
 
-Prints a full `FluxGateRun` as JSON. The demo uses `InMemoryTaskAPI` with a seeded
-authorization flaw — expect `risk_level: critical`.
+Starts the demo API (`demo_api/server.py`) and runs `flux-gate` against it.
+Outputs a full `FluxGateRun` as YAML. The demo API has a seeded authorization
+flaw — expect `risk_level: critical`.
 
 ## Tests
 
 ```bash
-# Unit tests (no Docker required)
+# Run tests inside Docker (canonical)
+docker compose run --rm test
+
+# Run tests locally (faster iteration)
 uv run pytest -m "not docker"
 
-# Docker integration tests (requires Docker daemon)
+# Run docker integration tests (requires Docker daemon)
 uv run pytest -m docker
-
-# Everything
-uv run pytest
 ```
 
 Coverage is printed to the terminal and written to `coverage.xml` after every run.
@@ -44,25 +44,14 @@ Coverage is printed to the terminal and written to `coverage.xml` after every ru
 
 ## Linting & formatting
 
+Pre-commit hooks run automatically on every `git commit`. To run manually:
+
 ```bash
 uv run ruff check .          # lint
 uv run ruff check . --fix    # lint + auto-fix
 uv run ruff format .         # format
-uv run mypy flux_gate tests main.py --strict  # type-check
+uv run mypy flux_gate tests main.py demo_api --strict  # type-check
 ```
-
-All three run automatically as pre-commit hooks on every `git commit`.
-
-## Docker Compose
-
-```bash
-docker compose build          # build images
-docker compose run --rm app   # run the demo inside a container
-docker compose run --rm test  # run unit tests inside a container
-```
-
-The `test` service runs `pytest -m "not docker"` — docker-in-docker is not set up
-and not needed.
 
 ## CI
 
