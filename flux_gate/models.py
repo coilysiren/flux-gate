@@ -166,8 +166,6 @@ class RiskReport(FluxGateModel):
 
 
 class FluxGateRun(FluxGateModel):
-    system_under_test: str
-    environment: str
     feature_spec: FeatureSpec | None = None
     iterations: list[IterationRecord]
     holdout_results: list[ExecutionResult] = Field(default_factory=list)

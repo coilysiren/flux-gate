@@ -74,8 +74,6 @@ class FluxGateRunner:
         feature_spec: FeatureSpec | None = None,
         gate_threshold: float = 0.90,
         fail_fast_tier: int | None = None,
-        system_under_test: str = "REST API",
-        environment: str = "deterministic_local",
     ) -> None:
         self._executor = executor
         self._operator = operator
@@ -87,8 +85,6 @@ class FluxGateRunner:
         self._feature_spec = feature_spec
         self._gate_threshold = gate_threshold
         self._fail_fast_tier = fail_fast_tier
-        self._system_under_test = system_under_test
-        self._environment = environment
 
     def run(self, iterations: list[IterationSpec] | None = None) -> FluxGateRun:
         specs = iterations or build_default_iteration_specs()
@@ -140,8 +136,6 @@ class FluxGateRunner:
                     holdout_results.append(self._nl_evaluator.evaluate(nl_scenario, self._executor))
 
         return FluxGateRun(
-            system_under_test=self._system_under_test,
-            environment=self._environment,
             feature_spec=self._feature_spec,
             iterations=records,
             holdout_results=holdout_results,
@@ -155,8 +149,6 @@ class FluxGateRunner:
             f"Issues: {'; '.join(assessment.issues) or 'none'}."
         )
         return FluxGateRun(
-            system_under_test=self._system_under_test,
-            environment=self._environment,
             feature_spec=self._feature_spec,
             iterations=[],
             holdout_results=[],

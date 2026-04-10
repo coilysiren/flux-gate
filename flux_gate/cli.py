@@ -104,8 +104,6 @@ def main(url: str, spec: str, actors: str, threshold: float, fail_fast: bool) ->
         feature_spec=feature_spec,
         gate_threshold=threshold,
         fail_fast_tier=0 if fail_fast else None,
-        system_under_test=url,
-        environment="local",
     )
 
     try:
