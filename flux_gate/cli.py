@@ -4,7 +4,6 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
 
 import yaml
 
@@ -19,9 +18,6 @@ _ENV_OPERATOR_TYPE = "FLUX_GATE_OPERATOR_TYPE"
 _ENV_OPERATOR_KEY = "FLUX_GATE_OPERATOR_KEY"
 _ENV_ADVERSARY_TYPE = "FLUX_GATE_ADVERSARY_TYPE"
 _ENV_ADVERSARY_KEY = "FLUX_GATE_ADVERSARY_KEY"
-
-_DEFAULT_SPEC = ".flux_gate/spec.yaml"
-_DEFAULT_ACTORS = ".flux_gate/actors.yaml"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -38,29 +34,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Base URL of the running API (e.g. http://localhost:8000)",
     )
     parser.add_argument(
-        "--name",
-        default=None,
-        help="Human-readable name for the system under test (default: URL hostname)",
-    )
-    parser.add_argument(
-        "--env",
-        default="local",
-        help="Environment label included in the report (default: local)",
-    )
-    parser.add_argument(
         "--spec",
-        default=None,
+        default=".flux_gate/spec.yaml",
         metavar="FILE",
-        help=(f"Path to a FeatureSpec YAML file (default: {_DEFAULT_SPEC} if it exists)"),
+        help="Path to a FeatureSpec YAML file (default: .flux_gate/spec.yaml)",
     )
     parser.add_argument(
         "--actors",
-        default=None,
+        default=".flux_gate/actors.yaml",
         metavar="FILE",
-        help=(
-            f"Path to an actors YAML file defining per-actor authentication "
-            f"(default: {_DEFAULT_ACTORS} if it exists)"
-        ),
+        help="Path to an actors YAML file defining per-actor authentication "
+        "(default: .flux_gate/actors.yaml)",
     )
     parser.add_argument(
         "--threshold",
@@ -70,31 +54,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Holdout satisfaction score required to recommend merge (default: 0.90)",
     )
     parser.add_argument(
-        "--fail-fast-tier",
-        type=int,
-        default=None,
-        metavar="N",
-        help=(
-            "Stop after the first iteration at tier >= N that finds a critical issue "
-            "(default: disabled — all iterations always run)"
-        ),
+        "--fail-fast",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Stop after the first critical finding "
+        "(default: enabled; use --no-fail-fast to run all iterations)",
     )
     return parser
 
 
-def _load_file(explicit: str | None, default: str) -> Path | None:
-    """Return the path to use for a config file, or None if it should be skipped.
-
-    If an explicit path was given and does not exist, exits 1 with an error.
-    If no explicit path was given, silently skips when the default is absent.
-    """
-    if explicit is not None:
-        p = Path(explicit)
-        if not p.exists():
-            print(f"error: file not found: {explicit}", file=sys.stderr)
-            sys.exit(1)
-        return p
-    p = Path(default)
+def _try_load(path: str) -> Path | None:
+    """Return the path if the file exists, otherwise None."""
+    p = Path(path)
     return p if p.exists() else None
 
 
@@ -131,15 +102,13 @@ def main() -> None:
         )
         sys.exit(1)
 
-    name: str = args.name or urlparse(args.url).netloc or args.url
-
     feature_spec: FeatureSpec | None = None
-    spec_path = _load_file(args.spec, _DEFAULT_SPEC)
+    spec_path = _try_load(args.spec)
     if spec_path is not None:
         feature_spec = FeatureSpec(**yaml.safe_load(spec_path.read_text()))
 
     actor_headers: dict[str, dict[str, str]] = {}
-    actors_path = _load_file(args.actors, _DEFAULT_ACTORS)
+    actors_path = _try_load(args.actors)
     if actors_path is not None:
         actor_headers = to_actor_headers(ActorsConfig(**yaml.safe_load(actors_path.read_text())))
 
@@ -151,9 +120,9 @@ def main() -> None:
         spec_assessor=DemoSpecAssessor() if feature_spec else None,
         feature_spec=feature_spec,
         gate_threshold=args.threshold,
-        fail_fast_tier=args.fail_fast_tier,
-        system_under_test=name,
-        environment=args.env,
+        fail_fast_tier=0 if args.fail_fast else None,
+        system_under_test=args.url,
+        environment="local",
     )
 
     try:

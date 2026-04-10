@@ -46,22 +46,20 @@ Using different providers for each role is intentional — model diversity reduc
 ### CLI
 
 ```
-flux-gate <url> [--name NAME] [--env ENV] [--spec FILE] [--actors FILE] [--threshold N] [--fail-fast-tier N]
+flux-gate <url> [--spec FILE] [--actors FILE] [--threshold N] [--no-fail-fast]
 ```
 
 | Argument | Default | Description |
 |---|---|---|
 | `url` | required | Base URL of the running API |
-| `--name` | URL hostname | Label for the system under test in the report |
-| `--env` | `local` | Environment label (e.g. `staging`, `ci`) |
-| `--spec` | — | Path to a [FeatureSpec YAML](#feature-spec) file; enables holdout evaluation and merge gate |
-| `--actors` | — | Path to an [actors YAML](#actor-authentication) file for per-actor credentials |
+| `--spec` | `.flux_gate/spec.yaml` | Path to a [FeatureSpec YAML](#feature-spec) file |
+| `--actors` | `.flux_gate/actors.yaml` | Path to an [actors YAML](#actor-authentication) file |
 | `--threshold` | `0.90` | Holdout satisfaction score required to recommend merge |
-| `--fail-fast-tier` | disabled | Stop after the first tier ≥ N that finds a critical issue |
+| `--fail-fast` / `--no-fail-fast` | enabled | Stop at the first critical finding; use `--no-fail-fast` to run all iterations |
 
 ```bash
 flux-gate http://localhost:8000
-flux-gate http://localhost:8000 --name "Task API" --env staging
+flux-gate http://localhost:8000 --no-fail-fast
 flux-gate http://localhost:8000 --spec /path/to/spec.yaml --actors /path/to/actors.yaml
 ```
 
