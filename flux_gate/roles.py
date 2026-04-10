@@ -7,15 +7,15 @@ from .models import (
     Assertion,
     AssertionResult,
     ExecutionResult,
-    FeatureSpec,
     Finding,
     HttpRequest,
+    Invariant,
+    InvariantAssessment,
     IterationRecord,
     IterationSpec,
     NaturalLanguageScenario,
     Scenario,
     ScenarioStep,
-    SpecAssessment,
 )
 
 if TYPE_CHECKING:
@@ -35,24 +35,24 @@ class Adversary(Protocol):
 
 
 class HoldoutEvaluator(Protocol):
-    """Returns structured acceptance scenarios from a FeatureSpec.
+    """Returns structured acceptance scenarios from an Invariant.
 
     The Operator never receives these scenarios or their results — this preserves
     the train/test separation described in the dark factory pattern.
     """
 
-    def acceptance_scenarios(self, spec: FeatureSpec) -> list[Scenario]: ...
+    def acceptance_scenarios(self, invariant: Invariant) -> list[Scenario]: ...
 
 
 class NaturalLanguageHoldoutEvaluator(Protocol):
-    """Converts FeatureSpec acceptance criteria into NaturalLanguageScenario objects.
+    """Converts Invariant must_hold properties into NaturalLanguageScenario objects.
 
-    Each criterion becomes a scenario described in plain English.  The Operator
-    never sees these criteria.  A ``NaturalLanguageEvaluator`` interprets them
+    Each property becomes a scenario described in plain English.  The Operator
+    never sees these properties.  A ``NaturalLanguageEvaluator`` interprets them
     at execution time without glue code.
     """
 
-    def acceptance_scenarios(self, spec: FeatureSpec) -> list[NaturalLanguageScenario]: ...
+    def acceptance_scenarios(self, invariant: Invariant) -> list[NaturalLanguageScenario]: ...
 
 
 class NaturalLanguageEvaluator(Protocol):
@@ -68,15 +68,15 @@ class NaturalLanguageEvaluator(Protocol):
     ) -> ExecutionResult: ...
 
 
-class SpecAssessor(Protocol):
-    """Evaluates a FeatureSpec for quality before the adversarial loop runs.
+class InvariantAssessor(Protocol):
+    """Evaluates an Invariant for quality before the adversarial loop runs.
 
-    Returns a ``SpecAssessment`` with a quality score, issues, suggestions,
+    Returns an ``InvariantAssessment`` with a quality score, issues, suggestions,
     and a ``proceed`` flag. When ``proceed`` is ``False``, the runner skips
     all iterations and returns a blocked merge gate.
     """
 
-    def assess(self, spec: FeatureSpec) -> SpecAssessment: ...
+    def assess(self, invariant: Invariant) -> InvariantAssessment: ...
 
 
 # Shared steps and assertions for the demo authorization scenario.
@@ -163,12 +163,12 @@ class DemoAdversary:
 class DemoHoldoutEvaluator:
     """Returns the cross-user authorization scenario as a structured holdout check."""
 
-    def acceptance_scenarios(self, spec: FeatureSpec) -> list[Scenario]:
+    def acceptance_scenarios(self, invariant: Invariant) -> list[Scenario]:
         return [
             Scenario(
                 name="holdout_user_cannot_modify_other_users_task",
                 category="authz",
-                goal="verify ownership enforcement per acceptance criteria",
+                goal="verify ownership enforcement per must_hold properties",
                 steps=_AUTHZ_STEPS,
                 assertions=_AUTHZ_ASSERTIONS,
             )
@@ -176,21 +176,21 @@ class DemoHoldoutEvaluator:
 
 
 class DemoNaturalLanguageHoldoutEvaluator:
-    """Converts each acceptance criterion into a NaturalLanguageScenario.
+    """Converts each must_hold property into a NaturalLanguageScenario.
 
-    A real implementation would parse the criterion with an LLM.  The demo
-    passes the criterion text verbatim as the ``verdict``.
+    A real implementation would parse the property with an LLM.  The demo
+    passes the property text verbatim as the ``verdict``.
     """
 
-    def acceptance_scenarios(self, spec: FeatureSpec) -> list[NaturalLanguageScenario]:
+    def acceptance_scenarios(self, invariant: Invariant) -> list[NaturalLanguageScenario]:
         return [
             NaturalLanguageScenario(
                 name=f"criterion_{i}",
-                description=spec.description,
+                description=invariant.description,
                 actors=["userA", "userB"],
                 verdict=criterion,
             )
-            for i, criterion in enumerate(spec.acceptance_criteria)
+            for i, criterion in enumerate(invariant.must_hold)
         ]
 
 
@@ -240,12 +240,12 @@ class DemoNaturalLanguageEvaluator:
         )
 
 
-class DemoSpecAssessor:
-    """Heuristic spec assessor for use without an LLM.
+class DemoInvariantAssessor:
+    """Heuristic invariant assessor for use without an LLM.
 
-    Scores a FeatureSpec based on:
-    - acceptance criteria length  (short criteria score low)
-    - presence of specific HTTP status codes in criteria  (score high)
+    Scores an Invariant based on:
+    - must_hold property length  (short properties score low)
+    - presence of specific HTTP status codes in properties  (score high)
     - presence of target_endpoints  (score high)
 
     A ``quality_score`` below 0.5 sets ``proceed=False``, blocking the run.
@@ -254,33 +254,37 @@ class DemoSpecAssessor:
     _MIN_CRITERION_LEN = 20
     _STATUS_CODE_RE = re.compile(r"\b[1-5]\d{2}\b")
 
-    def assess(self, spec: FeatureSpec) -> SpecAssessment:
+    def assess(self, invariant: Invariant) -> InvariantAssessment:
         issues: list[str] = []
         suggestions: list[str] = []
         score = 1.0
 
-        for criterion in spec.acceptance_criteria:
+        for criterion in invariant.must_hold:
             if len(criterion.strip()) < self._MIN_CRITERION_LEN:
                 issues.append(
-                    f"Criterion too vague (< {self._MIN_CRITERION_LEN} chars): {criterion!r}"
+                    f"Property too vague (< {self._MIN_CRITERION_LEN} chars): {criterion!r}"
                 )
                 suggestions.append(
                     "Specify expected status codes, fields, or observable behaviour."
                 )
                 score -= 0.3
 
-        if not spec.target_endpoints:
+        if not invariant.target_endpoints:
             issues.append("No target_endpoints specified.")
-            suggestions.append("List the endpoints the spec covers (e.g. 'PATCH /tasks/{id}').")
+            suggestions.append(
+                "List the endpoints the invariant covers (e.g. 'PATCH /tasks/{id}')."
+            )
             score -= 0.2
 
-        has_status_code = any(self._STATUS_CODE_RE.search(c) for c in spec.acceptance_criteria)
+        has_status_code = any(self._STATUS_CODE_RE.search(c) for c in invariant.must_hold)
         if not has_status_code:
-            suggestions.append("Consider adding expected HTTP status codes to acceptance criteria.")
+            suggestions.append(
+                "Consider adding expected HTTP status codes to must_hold properties."
+            )
             score -= 0.1
 
         quality_score = round(max(0.0, score), 4)
-        return SpecAssessment(
+        return InvariantAssessment(
             quality_score=quality_score,
             issues=issues,
             suggestions=suggestions,

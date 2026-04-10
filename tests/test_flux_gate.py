@@ -1,14 +1,14 @@
 from flux_gate import (
     DemoAdversary,
     DemoHoldoutEvaluator,
+    DemoInvariantAssessor,
     DemoNaturalLanguageEvaluator,
     DemoNaturalLanguageHoldoutEvaluator,
     DemoOperator,
-    DemoSpecAssessor,
     DeterministicLocalExecutor,
-    FeatureSpec,
     FluxGateRunner,
     InMemoryTaskAPI,
+    Invariant,
 )
 
 
@@ -45,11 +45,11 @@ def test_demo_scenario_surfaces_authz_failure() -> None:
 
 
 def test_nl_holdout_gate_blocks_failing_api() -> None:
-    """NaturalLanguageScenario path: criteria are parsed from the spec at runtime."""
-    spec = FeatureSpec(
+    """NaturalLanguageScenario path: must_hold properties are parsed from the invariant."""
+    inv = Invariant(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
-        acceptance_criteria=["A PATCH by a non-owner is rejected with 403"],
+        must_hold=["A PATCH by a non-owner is rejected with 403"],
         target_endpoints=["PATCH /tasks/{id}"],
     )
 
@@ -59,7 +59,7 @@ def test_nl_holdout_gate_blocks_failing_api() -> None:
         adversary=DemoAdversary(),
         nl_holdout_evaluator=DemoNaturalLanguageHoldoutEvaluator(),
         nl_evaluator=DemoNaturalLanguageEvaluator(),
-        feature_spec=spec,
+        invariant=inv,
         gate_threshold=0.90,
     )
 
@@ -73,10 +73,10 @@ def test_nl_holdout_gate_blocks_failing_api() -> None:
 
 
 def test_holdout_gate_blocks_failing_api() -> None:
-    spec = FeatureSpec(
+    inv = Invariant(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
-        acceptance_criteria=["A PATCH by a non-owner is rejected with 403"],
+        must_hold=["A PATCH by a non-owner is rejected with 403"],
         target_endpoints=["PATCH /tasks/{id}"],
     )
 
@@ -85,13 +85,13 @@ def test_holdout_gate_blocks_failing_api() -> None:
         operator=DemoOperator(),
         adversary=DemoAdversary(),
         holdout_evaluator=DemoHoldoutEvaluator(),
-        feature_spec=spec,
+        invariant=inv,
         gate_threshold=0.90,
     )
 
     run = runner.run()
 
-    assert run.feature_spec == spec
+    assert run.invariant == inv
     assert len(run.holdout_results) == 1
     assert run.holdout_results[0].satisfaction_score == 0.0  # 0/2 assertions passed
     assert run.risk_report.merge_gate is not None
@@ -118,12 +118,12 @@ def test_fail_fast_tier_stops_early_on_critical_finding() -> None:
     assert any(f.severity == "critical" for f in run.iterations[0].findings)
 
 
-def test_preflight_blocks_vague_spec() -> None:
-    """DemoSpecAssessor rejects a spec whose criteria are too short."""
-    vague_spec = FeatureSpec(
+def test_preflight_blocks_vague_invariant() -> None:
+    """DemoInvariantAssessor rejects an invariant whose must_hold properties are too short."""
+    vague = Invariant(
         title="Make it secure",
         description="It should be secure.",
-        acceptance_criteria=["secure", "no bugs"],  # both under 20 chars
+        must_hold=["secure", "no bugs"],  # both under 20 chars
         target_endpoints=[],
     )
 
@@ -131,26 +131,26 @@ def test_preflight_blocks_vague_spec() -> None:
         executor=DeterministicLocalExecutor(InMemoryTaskAPI()),
         operator=DemoOperator(),
         adversary=DemoAdversary(),
-        spec_assessor=DemoSpecAssessor(),
-        feature_spec=vague_spec,
+        assessor=DemoInvariantAssessor(),
+        invariant=vague,
     )
 
     run = runner.run()
 
     assert run.iterations == []
-    assert run.spec_assessment is not None
-    assert run.spec_assessment.proceed is False
-    assert run.spec_assessment.quality_score < 0.5
+    assert run.invariant_assessment is not None
+    assert run.invariant_assessment.proceed is False
+    assert run.invariant_assessment.quality_score < 0.5
     assert run.risk_report.merge_gate is not None
     assert run.risk_report.merge_gate.recommendation == "block"
 
 
-def test_preflight_passes_good_spec() -> None:
-    """DemoSpecAssessor accepts a well-formed spec and allows the loop to run."""
-    good_spec = FeatureSpec(
+def test_preflight_passes_good_invariant() -> None:
+    """DemoInvariantAssessor accepts a well-formed invariant and allows the loop to run."""
+    good = Invariant(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
-        acceptance_criteria=["A PATCH by a non-owner is rejected with 403"],
+        must_hold=["A PATCH by a non-owner is rejected with 403"],
         target_endpoints=["PATCH /tasks/{id}"],
     )
 
@@ -158,13 +158,13 @@ def test_preflight_passes_good_spec() -> None:
         executor=DeterministicLocalExecutor(InMemoryTaskAPI()),
         operator=DemoOperator(),
         adversary=DemoAdversary(),
-        spec_assessor=DemoSpecAssessor(),
-        feature_spec=good_spec,
+        assessor=DemoInvariantAssessor(),
+        invariant=good,
     )
 
     run = runner.run()
 
-    assert run.spec_assessment is not None
-    assert run.spec_assessment.proceed is True
-    assert run.spec_assessment.quality_score >= 0.5
+    assert run.invariant_assessment is not None
+    assert run.invariant_assessment.proceed is True
+    assert run.invariant_assessment.quality_score >= 0.5
     assert len(run.iterations) == 4  # full loop ran

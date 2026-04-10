@@ -3,7 +3,7 @@ description: >
   When a task is created, its owner field must be derived from the authenticated
   actor identity — not from anything supplied in the request body. A caller must
   not be able to forge ownership by passing an owner field in the POST body.
-acceptance_criteria:
+must_hold:
   - The owner field in the created task matches the authenticated actor
   - Passing a different owner value in the request body has no effect on the stored owner
   - A subsequent GET by the actual actor returns a task whose owner matches the actor

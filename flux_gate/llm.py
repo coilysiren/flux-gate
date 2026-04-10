@@ -231,10 +231,10 @@ def _operator_user_prompt(spec: IterationSpec, previous_iterations: list[Iterati
         f"Goal: {spec.goal}",
         f"Instruction: {spec.operator_prompt}",
     ]
-    if spec.feature_spec:
-        parts.append(f"Feature: {spec.feature_spec.description.strip()}")
-        if spec.feature_spec.target_endpoints:
-            parts.append(f"Target endpoints: {', '.join(spec.feature_spec.target_endpoints)}")
+    if spec.invariant:
+        parts.append(f"Invariant: {spec.invariant.description.strip()}")
+        if spec.invariant.target_endpoints:
+            parts.append(f"Target endpoints: {', '.join(spec.invariant.target_endpoints)}")
 
     if previous_iterations:
         parts.append("\n## Previous Findings")

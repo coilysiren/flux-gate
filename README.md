@@ -48,13 +48,13 @@ Using different providers for each role is intentional — model diversity reduc
 ### CLI
 
 ```
-flux-gate <url> [--spec FILE_OR_DIR] [--actors FILE] [--threshold N] [--no-fail-fast]
+flux-gate <url> [--invariant FILE_OR_DIR] [--actors FILE] [--threshold N] [--no-fail-fast]
 ```
 
 | Argument | Default | Description |
 |---|---|---|
 | `url` | required | Base URL of the running API |
-| `--spec` | `.flux_gate/specs` | Path to a [FeatureSpec YAML](#feature-spec) file, or a directory of YAML files (one spec per file) |
+| `--invariant` | `.flux_gate/invariants` | Path to an [Invariant YAML](#invariants) file, or a directory of YAML files (one invariant per file) |
 | `--actors` | `.flux_gate/actors.yaml` | Path to an [actors YAML](#actor-authentication) file |
 | `--threshold` | `0.90` | Holdout satisfaction score required to recommend merge |
 | `--fail-fast` / `--no-fail-fast` | enabled | Stop at the first critical finding; use `--no-fail-fast` to run all iterations |
@@ -62,8 +62,8 @@ flux-gate <url> [--spec FILE_OR_DIR] [--actors FILE] [--threshold N] [--no-fail-
 ```bash
 flux-gate http://localhost:8000
 flux-gate http://localhost:8000 --no-fail-fast
-flux-gate http://localhost:8000 --spec /path/to/specs/ --actors /path/to/actors.yaml
-flux-gate http://localhost:8000 --spec /path/to/single_spec.yaml
+flux-gate http://localhost:8000 --invariant /path/to/invariants/ --actors /path/to/actors.yaml
+flux-gate http://localhost:8000 --invariant /path/to/single_invariant.yaml
 ```
 
 Output is YAML:
@@ -91,28 +91,28 @@ The CLI discovers them automatically — no flags needed for the common case:
 ```
 your-project/
 ├── .flux_gate/
-│   ├── specs/                 # one YAML file per FeatureSpec — all loaded automatically
+│   ├── invariants/            # one YAML file per Invariant — all loaded automatically
 │   │   ├── task_ownership.yaml
 │   │   └── task_read_isolation.yaml
 │   └── actors.yaml            # Actor auth — loaded automatically if present
 └── ...
 ```
 
-Override either path with `--spec FILE_OR_DIR` or `--actors FILE`.
+Override either path with `--invariant FILE_OR_DIR` or `--actors FILE`.
 
-### Feature spec
+### Invariants
 
-A FeatureSpec tells Flux Gate what you're testing and defines the holdout acceptance criteria.
-Acceptance criteria are never shown to the Operator — only to the holdout evaluator — preserving
-the train/test separation.
+An Invariant defines a property the system must maintain under adversarial pressure.
+The `must_hold` properties are never shown to the Operator — only to the holdout evaluator —
+preserving the train/test separation.
 
 ```yaml
-# .flux_gate/specs/task_ownership.yaml
+# .flux_gate/invariants/task_ownership.yaml
 title: Users cannot modify each other's tasks
 description: >
   The task API must enforce resource ownership. A user who did not create
   a task must not be able to modify or delete it.
-acceptance_criteria:
+must_hold:
   - A PATCH request by a non-owner is rejected with 403
   - The task body is unchanged after an unauthorized PATCH attempt
   - A GET by the owner after an unauthorized PATCH returns the original data

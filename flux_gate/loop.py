@@ -5,22 +5,22 @@ from typing import Literal
 from .executor import DeterministicLocalExecutor
 from .models import (
     ExecutionResult,
-    FeatureSpec,
     Finding,
     FluxGateRun,
+    Invariant,
+    InvariantAssessment,
     IterationRecord,
     IterationSpec,
     MergeGate,
     RiskReport,
-    SpecAssessment,
 )
 from .roles import (
     Adversary,
     HoldoutEvaluator,
+    InvariantAssessor,
     NaturalLanguageEvaluator,
     NaturalLanguageHoldoutEvaluator,
     Operator,
-    SpecAssessor,
 )
 
 
@@ -70,8 +70,8 @@ class FluxGateRunner:
         holdout_evaluator: HoldoutEvaluator | None = None,
         nl_holdout_evaluator: NaturalLanguageHoldoutEvaluator | None = None,
         nl_evaluator: NaturalLanguageEvaluator | None = None,
-        spec_assessor: SpecAssessor | None = None,
-        feature_spec: FeatureSpec | None = None,
+        assessor: InvariantAssessor | None = None,
+        invariant: Invariant | None = None,
         gate_threshold: float = 0.90,
         fail_fast_tier: int | None = None,
     ) -> None:
@@ -81,26 +81,26 @@ class FluxGateRunner:
         self._holdout_evaluator = holdout_evaluator
         self._nl_holdout_evaluator = nl_holdout_evaluator
         self._nl_evaluator = nl_evaluator
-        self._spec_assessor = spec_assessor
-        self._feature_spec = feature_spec
+        self._assessor = assessor
+        self._invariant = invariant
         self._gate_threshold = gate_threshold
         self._fail_fast_tier = fail_fast_tier
 
     def run(self, iterations: list[IterationSpec] | None = None) -> FluxGateRun:
         specs = iterations or build_default_iteration_specs()
 
-        # Preflight: assess spec quality before running any iterations.
-        spec_assessment: SpecAssessment | None = None
-        if self._spec_assessor is not None and self._feature_spec is not None:
-            spec_assessment = self._spec_assessor.assess(self._feature_spec)
-            if not spec_assessment.proceed:
-                return self._blocked_by_preflight(spec_assessment)
+        # Preflight: assess invariant quality before running any iterations.
+        invariant_assessment: InvariantAssessment | None = None
+        if self._assessor is not None and self._invariant is not None:
+            invariant_assessment = self._assessor.assess(self._invariant)
+            if not invariant_assessment.proceed:
+                return self._blocked_by_preflight(invariant_assessment)
 
-        # Inject feature_spec into each iteration so the Operator can read
-        # spec.feature_spec.description — but never acceptance_criteria, which
+        # Inject invariant into each iteration so the Operator can read
+        # spec.invariant.description — but never must_hold, which
         # is only passed to the holdout evaluators below.
-        if self._feature_spec:
-            specs = [s.model_copy(update={"feature_spec": self._feature_spec}) for s in specs]
+        if self._invariant:
+            specs = [s.model_copy(update={"invariant": self._invariant}) for s in specs]
 
         records: list[IterationRecord] = []
         for spec in specs:
@@ -125,43 +125,43 @@ class FluxGateRunner:
         # Holdout scenarios are executed after the probe loop and their results
         # are never fed back to the Operator or Adversary.
         holdout_results: list[ExecutionResult] = []
-        if self._feature_spec is not None:
+        if self._invariant is not None:
             if self._holdout_evaluator is not None:
-                for scenario in self._holdout_evaluator.acceptance_scenarios(self._feature_spec):
+                for scenario in self._holdout_evaluator.acceptance_scenarios(self._invariant):
                     holdout_results.append(self._executor.run_scenario(scenario))
 
             if self._nl_holdout_evaluator is not None and self._nl_evaluator is not None:
-                nl_scenarios = self._nl_holdout_evaluator.acceptance_scenarios(self._feature_spec)
+                nl_scenarios = self._nl_holdout_evaluator.acceptance_scenarios(self._invariant)
                 for nl_scenario in nl_scenarios:
                     holdout_results.append(self._nl_evaluator.evaluate(nl_scenario, self._executor))
 
         return FluxGateRun(
-            feature_spec=self._feature_spec,
+            invariant=self._invariant,
             iterations=records,
             holdout_results=holdout_results,
-            spec_assessment=spec_assessment,
+            invariant_assessment=invariant_assessment,
             risk_report=_build_risk_report(records, holdout_results, self._gate_threshold),
         )
 
-    def _blocked_by_preflight(self, assessment: SpecAssessment) -> FluxGateRun:
+    def _blocked_by_preflight(self, assessment: InvariantAssessment) -> FluxGateRun:
         rationale = (
-            f"Spec quality score {assessment.quality_score:.0%} is too low to proceed. "
+            f"Invariant quality score {assessment.quality_score:.0%} is too low to proceed. "
             f"Issues: {'; '.join(assessment.issues) or 'none'}."
         )
         return FluxGateRun(
-            feature_spec=self._feature_spec,
+            invariant=self._invariant,
             iterations=[],
             holdout_results=[],
-            spec_assessment=assessment,
+            invariant_assessment=assessment,
             risk_report=RiskReport(
                 confidence_score=0.0,
                 risk_level="low",
-                summary=["Run blocked by preflight spec assessment."],
+                summary=["Run blocked by preflight invariant assessment."],
                 confirmed_failures=[],
                 suspicious_patterns=[],
                 unexplored_surfaces=[],
                 coverage=[],
-                conclusion="Run blocked: spec quality score below threshold.",
+                conclusion="Run blocked: invariant quality score below threshold.",
                 merge_gate=MergeGate(
                     passed=False,
                     holdout_satisfaction_score=0.0,

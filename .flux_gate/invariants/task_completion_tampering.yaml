@@ -3,7 +3,7 @@ description: >
   The completed flag on a task is a mutating field. A user who did not create
   a task must not be able to flip its completed status via PATCH. Ownership must
   be checked on every field update, not just title changes.
-acceptance_criteria:
+must_hold:
   - A PATCH request setting completed=true by a non-owner is rejected with 403
   - The completed field is unchanged after an unauthorized PATCH attempt
   - The owner can still successfully toggle completed on their own task
