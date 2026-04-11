@@ -39,6 +39,7 @@ class Plan(GauntletModel):
     goal: str
     steps: list[PlanStep]
     assertions: list[Assertion] = Field(default_factory=list)
+    weapon_id: str | None = None
 
 
 class NaturalLanguagePlan(GauntletModel):

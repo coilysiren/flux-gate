@@ -31,6 +31,7 @@ from .roles import (
     DemoNaturalLanguageVitals,
     DemoWeaponAssessor,
 )
+from .store import PlanStore
 
 __all__ = [
     "UsersConfig",
@@ -69,6 +70,7 @@ __all__ = [
     "WeaponAssessment",
     "WeaponBrief",
     "build_default_iteration_specs",
+    "PlanStore",
     "create_inspector",
     "create_attacker",
     "to_user_headers",
