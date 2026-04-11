@@ -3,7 +3,7 @@ description: >
   The task API must enforce read isolation. A user who did not create a task
   must not be able to retrieve it. The GET endpoint must check ownership before
   returning any task data.
-must_hold:
+blockers:
   - A GET request by a non-owner returns 403
   - The response body for an unauthorized GET contains no task data
   - The owner can still successfully retrieve the task after an unauthorized access attempt

@@ -59,7 +59,7 @@ class HoldoutVitals(Protocol):
 
 
 class NaturalLanguageHoldoutVitals(Protocol):
-    """Converts Weapon must_hold properties into NaturalLanguagePlan objects.
+    """Converts Weapon blockers into NaturalLanguagePlan objects.
 
     Each property becomes a plan described in plain English.  The Attacker
     never sees these properties.  A ``NaturalLanguageVitals`` interprets them
@@ -180,7 +180,7 @@ class DemoHoldoutVitals:
             Plan(
                 name="holdout_user_cannot_modify_other_users_task",
                 category="authz",
-                goal="verify ownership enforcement per must_hold properties",
+                goal="verify ownership enforcement per blockers",
                 steps=_AUTHZ_STEPS,
                 assertions=_AUTHZ_ASSERTIONS,
             )
@@ -188,7 +188,7 @@ class DemoHoldoutVitals:
 
 
 class DemoNaturalLanguageHoldoutVitals:
-    """Converts each must_hold property into a NaturalLanguagePlan.
+    """Converts each blocker into a NaturalLanguagePlan.
 
     A real implementation would parse the property with an LLM.  The demo
     passes the property text verbatim as the ``verdict``.
@@ -254,8 +254,8 @@ class DemoWeaponAssessor:
     """Heuristic weapon assessor for use without an LLM.
 
     Scores a Weapon based on:
-    - must_hold property length  (short properties score low)
-    - presence of specific HTTP status codes in properties  (score high)
+    - blocker length  (short blockers score low)
+    - presence of specific HTTP status codes in blockers  (score high)
     - presence of target_endpoints  (score high)
 
     A ``quality_score`` below 0.5 sets ``proceed=False``, blocking the run.

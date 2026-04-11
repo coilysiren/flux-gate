@@ -46,7 +46,7 @@ def test_demo_plan_surfaces_authz_failure() -> None:
 
 
 def test_nl_holdout_gate_blocks_failing_api() -> None:
-    """NaturalLanguagePlan path: must_hold properties are parsed from the weapon."""
+    """NaturalLanguagePlan path: blockers are parsed from the weapon."""
     inv = Weapon(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
@@ -118,7 +118,7 @@ def test_fail_fast_tier_stops_early_on_critical_finding() -> None:
 
 
 def test_preflight_blocks_vague_weapon() -> None:
-    """DemoWeaponAssessor rejects a weapon whose must_hold properties are too short."""
+    """DemoWeaponAssessor rejects a weapon whose blockers are too short."""
     vague = Weapon(
         title="Make it secure",
         description="It should be secure.",
