@@ -4,7 +4,7 @@
 
 ## Summary
 
-Introduce `Target` as a first-class model, rename `must_hold` to `fatals` on `Weapon`, and wire both into the runner and CLI. A weapon is a reusable, system-agnostic attack strategy. A target parameterizes that weapon against a specific API surface. Together they drive the vitals evaluation.
+Introduce `Target` as a first-class model, rename `must_hold` to `blockers` on `Weapon`, and wire both into the runner and CLI. A weapon is a reusable, system-agnostic attack strategy. A target parameterizes that weapon against a specific API surface. Together they drive the vitals evaluation.
 
 ## Data model changes
 
@@ -21,9 +21,9 @@ class Target(FluxGateModel):
 ### Modified: `Weapon`
 
 - Remove `target_endpoints: list[str]` — moves to `Target.endpoints`
-- Rename `must_hold: list[str]` → `fatals: list[str]`
+- Rename `must_hold: list[str]` → `blockers: list[str]`
 
-`fatals` are the properties the system must never violate. They are passed only to the holdout vitals, never to the Operator, preserving the train/test split.
+`blockers` are the properties the system must never violate. They are passed only to the holdout vitals, never to the Operator, preserving the train/test split.
 
 ### Modified: `IterationSpec`
 
@@ -41,11 +41,11 @@ Signature changes from `assess(weapon)` to `assess(weapon, target)`. Both are re
 
 ### `HoldoutVitals` / `NaturalLanguageHoldoutVitals`
 
-No change. These protocols use `weapon.fatals` and `weapon.description`, neither of which moves to `Target`.
+No change. These protocols use `weapon.blockers` and `weapon.description`, neither of which moves to `Target`.
 
 ### `DemoWeaponAssessor`
 
-Updated to check `target.endpoints` (was `weapon.target_endpoints`) and `weapon.fatals` (was `weapon.must_hold`).
+Updated to check `target.endpoints` (was `weapon.target_endpoints`) and `weapon.blockers` (was `weapon.must_hold`).
 
 ## Runner changes
 
@@ -84,7 +84,7 @@ Example weapon YAML (after rename):
 title: Broken authentication
 description: >
   The auth system must reject unauthenticated and cross-user requests.
-fatals:
+blockers:
   - A POST to /auth/login with invalid credentials returns 401
   - A request with a token belonging to user A cannot access user B's resources
 ```
@@ -99,14 +99,14 @@ endpoints:
   - POST /auth/refresh
 ```
 
-## Rename: `must_hold` → `fatals`
+## Rename: `must_hold` → `blockers`
 
 All references updated:
 
-- `Weapon.fatals` (model)
-- `DemoNaturalLanguageHoldoutVitals` — iterates `weapon.fatals`
-- `DemoWeaponAssessor` — checks `weapon.fatals`
-- Tests — `Weapon(fatals=[...], ...)`
+- `Weapon.blockers` (model)
+- `DemoNaturalLanguageHoldoutVitals` — iterates `weapon.blockers`
+- `DemoWeaponAssessor` — checks `weapon.blockers`
+- Tests — `Weapon(blockers=[...], ...)`
 - Docs — YAML examples in README and usage.md
 
 ## Files affected
