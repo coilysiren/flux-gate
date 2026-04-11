@@ -36,11 +36,11 @@ def build_default_iteration_specs() -> list[IterationSpec]:
         ),
         IterationSpec(
             index=2,
-            name="boundary_and_invariants",
-            goal="boundary_and_invariants",
+            name="boundary_and_guards",
+            goal="boundary_and_guards",
             tier=1,
             operator_prompt="Target edge cases, missing fields, and schema drift.",
-            adversary_prompt="Escalate invariant violations.",
+            adversary_prompt="Escalate guard violations.",
         ),
         IterationSpec(
             index=3,

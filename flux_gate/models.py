@@ -21,7 +21,7 @@ class HttpResponse(FluxGateModel):
 
 
 class Assertion(FluxGateModel):
-    kind: Literal["status_code", "invariant"]
+    kind: Literal["status_code", "guard"]
     expected: Any | None = None
     rule: str | None = None
     step_index: int
@@ -64,7 +64,7 @@ class ExecutionStepResult(FluxGateModel):
 
 class AssertionResult(FluxGateModel):
     name: str
-    kind: Literal["status_code", "invariant", "verdict"]
+    kind: Literal["status_code", "guard", "verdict"]
     passed: bool
     detail: str
 

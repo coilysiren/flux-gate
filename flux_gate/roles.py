@@ -104,7 +104,7 @@ _AUTHZ_ASSERTIONS = [
     ),
     Assertion(
         name="task_not_modified_by_other_user",
-        kind="invariant",
+        kind="guard",
         rule="task_not_modified_by_other_user",
         step_index=3,
     ),
@@ -152,7 +152,7 @@ class DemoAdversary:
                     next_targets=[
                         "ownership mutation",
                         "list endpoint visibility",
-                        "partial update invariants",
+                        "partial update guards",
                     ],
                     evidence=evidence,
                 )

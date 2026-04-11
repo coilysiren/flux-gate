@@ -177,5 +177,5 @@ def _evaluate_assertion(
         name=assertion.name,
         kind=assertion.kind,
         passed=False,
-        detail=f"unknown invariant rule: {assertion.rule}",
+        detail=f"unknown guard rule: {assertion.rule}",
     )

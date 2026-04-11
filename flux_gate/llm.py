@@ -64,7 +64,7 @@ Rules:
 - Use {task_id} as a path template variable — it resolves from the "id" field in the first
   POST /tasks response body
 - Assertion kind "status_code" requires an integer "expected" field and null "rule"
-- Assertion kind "invariant" requires rule "task_not_modified_by_other_user" and null "expected"
+- Assertion kind "guard" requires rule "task_not_modified_by_other_user" and null "expected"
   (checks that last_modified_by == owner on a GET /tasks/{task_id} response)
 - step_index is 1-based
 - Generate 2–4 scenarios per call; prefer variety over repetition
@@ -73,7 +73,7 @@ Rules:
 _ADVERSARY_SYSTEM = """\
 You are a security Adversary in an adversarial quality-control loop.
 You analyze HTTP API test results and surface security weaknesses, logic failures,
-and invariant violations.
+and guard violations.
 
 Respond with ONLY a valid JSON object matching this schema exactly:
 {

@@ -117,9 +117,9 @@ runner = FluxGateRunner(
 2. Add an evaluation branch in `_evaluate_assertion()` in `executor.py`
 3. Add a test case in `tests/test_flux_gate.py`
 
-## Adding a new invariant rule
+## Adding a new guard rule
 
-Add a branch keyed on `assertion.rule` inside the `"invariant"` block of
+Add a branch keyed on `assertion.rule` inside the `"guard"` block of
 `_evaluate_assertion()` in `executor.py`. The rule string is set by the
 `Operator` when it constructs the `Assertion` object.
 
