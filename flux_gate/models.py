@@ -109,7 +109,6 @@ class Weapon(FluxGateModel):
     title: str
     description: str
     blockers: list[str]
-    target_endpoints: list[str] = Field(default_factory=list)
 
 
 class WeaponAssessment(FluxGateModel):
@@ -126,6 +125,18 @@ class WeaponAssessment(FluxGateModel):
     proceed: bool
 
 
+class Target(FluxGateModel):
+    """Engineer-specified API surface to test a Weapon against.
+
+    ``endpoints`` lists the HTTP method+path pairs the weapon's scenarios
+    should exercise (e.g. ``"PATCH /tasks/{id}"``). Additional configuration
+    fields will be added here as the model grows.
+    """
+
+    title: str
+    endpoints: list[str]
+
+
 class IterationSpec(FluxGateModel):
     index: int
     name: str
@@ -134,6 +145,7 @@ class IterationSpec(FluxGateModel):
     adversary_prompt: str
     tier: int = 0
     weapon: Weapon | None = None
+    target: Target | None = None
 
 
 class IterationRecord(FluxGateModel):
@@ -167,6 +179,7 @@ class RiskReport(FluxGateModel):
 
 class FluxGateRun(FluxGateModel):
     weapon: Weapon | None = None
+    target: Target | None = None
     iterations: list[IterationRecord]
     holdout_results: list[ExecutionResult] = Field(default_factory=list)
     weapon_assessment: WeaponAssessment | None = None

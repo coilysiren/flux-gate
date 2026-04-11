@@ -11,6 +11,7 @@ from .models import (
     IterationSpec,
     MergeGate,
     RiskReport,
+    Target,
     Weapon,
     WeaponAssessment,
 )
@@ -72,6 +73,7 @@ class FluxGateRunner:
         nl_vitals: NaturalLanguageVitals | None = None,
         assessor: WeaponAssessor | None = None,
         weapon: Weapon | None = None,
+        target: Target | None = None,
         gate_threshold: float = 0.90,
         fail_fast_tier: int | None = None,
     ) -> None:
@@ -83,6 +85,7 @@ class FluxGateRunner:
         self._nl_vitals = nl_vitals
         self._assessor = assessor
         self._weapon = weapon
+        self._target = target
         self._gate_threshold = gate_threshold
         self._fail_fast_tier = fail_fast_tier
 
@@ -92,15 +95,17 @@ class FluxGateRunner:
         # Preflight: assess weapon quality before running any iterations.
         weapon_assessment: WeaponAssessment | None = None
         if self._assessor is not None and self._weapon is not None:
-            weapon_assessment = self._assessor.assess(self._weapon)
+            weapon_assessment = self._assessor.assess(self._weapon, self._target)
             if not weapon_assessment.proceed:
                 return self._blocked_by_preflight(weapon_assessment)
 
-        # Inject weapon into each iteration so the Operator can read
+        # Inject weapon and target into each iteration so the Operator can read
         # spec.weapon.description — but never blockers, which
         # are only passed to the holdout vitals below.
         if self._weapon:
-            specs = [s.model_copy(update={"weapon": self._weapon}) for s in specs]
+            specs = [
+                s.model_copy(update={"weapon": self._weapon, "target": self._target}) for s in specs
+            ]
 
         records: list[IterationRecord] = []
         for spec in specs:
@@ -137,6 +142,7 @@ class FluxGateRunner:
 
         return FluxGateRun(
             weapon=self._weapon,
+            target=self._target,
             iterations=records,
             holdout_results=holdout_results,
             weapon_assessment=weapon_assessment,
@@ -150,6 +156,7 @@ class FluxGateRunner:
         )
         return FluxGateRun(
             weapon=self._weapon,
+            target=self._target,
             iterations=[],
             holdout_results=[],
             weapon_assessment=assessment,
@@ -244,7 +251,7 @@ def _build_merge_gate(holdout_results: list[ExecutionResult], threshold: float) 
 def _derive_unexplored_surfaces(findings: list[Finding]) -> list[str]:
     if not findings:
         return ["No high-risk unexplored surfaces identified."]
-    return sorted({target for finding in findings for target in finding.next_targets})
+    return sorted({surface for finding in findings for surface in finding.next_targets})
 
 
 def _confidence_score(findings: list[Finding]) -> float:

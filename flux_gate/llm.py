@@ -233,8 +233,8 @@ def _operator_user_prompt(spec: IterationSpec, previous_iterations: list[Iterati
     ]
     if spec.weapon:
         parts.append(f"Weapon: {spec.weapon.description.strip()}")
-        if spec.weapon.target_endpoints:
-            parts.append(f"Target endpoints: {', '.join(spec.weapon.target_endpoints)}")
+    if spec.target and spec.target.endpoints:
+        parts.append(f"Target endpoints: {', '.join(spec.target.endpoints)}")
 
     if previous_iterations:
         parts.append("\n## Previous Findings")

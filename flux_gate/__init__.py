@@ -18,6 +18,7 @@ from .models import (
     RiskReport,
     Scenario,
     ScenarioStep,
+    Target,
     Weapon,
     WeaponAssessment,
 )
@@ -62,6 +63,7 @@ __all__ = [
     "RiskReport",
     "Scenario",
     "ScenarioStep",
+    "Target",
     "Weapon",
     "WeaponAssessment",
     "build_default_iteration_specs",

@@ -8,6 +8,7 @@ from flux_gate import (
     DeterministicLocalExecutor,
     FluxGateRunner,
     InMemoryTaskAPI,
+    Target,
     Weapon,
 )
 
@@ -50,7 +51,6 @@ def test_nl_holdout_gate_blocks_failing_api() -> None:
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
         blockers=["A PATCH by a non-owner is rejected with 403"],
-        target_endpoints=["PATCH /tasks/{id}"],
     )
 
     runner = FluxGateRunner(
@@ -77,7 +77,6 @@ def test_holdout_gate_blocks_failing_api() -> None:
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
         blockers=["A PATCH by a non-owner is rejected with 403"],
-        target_endpoints=["PATCH /tasks/{id}"],
     )
 
     runner = FluxGateRunner(
@@ -124,7 +123,6 @@ def test_preflight_blocks_vague_weapon() -> None:
         title="Make it secure",
         description="It should be secure.",
         blockers=["secure", "no bugs"],  # both under 20 chars
-        target_endpoints=[],
     )
 
     runner = FluxGateRunner(
@@ -146,13 +144,13 @@ def test_preflight_blocks_vague_weapon() -> None:
 
 
 def test_preflight_passes_good_weapon() -> None:
-    """DemoWeaponAssessor accepts a well-formed weapon and allows the loop to run."""
+    """DemoWeaponAssessor accepts a well-formed weapon+target and allows the loop to run."""
     good = Weapon(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
         blockers=["A PATCH by a non-owner is rejected with 403"],
-        target_endpoints=["PATCH /tasks/{id}"],
     )
+    target = Target(title="Task endpoints", endpoints=["PATCH /tasks/{id}"])
 
     runner = FluxGateRunner(
         executor=DeterministicLocalExecutor(InMemoryTaskAPI()),
@@ -160,6 +158,7 @@ def test_preflight_passes_good_weapon() -> None:
         adversary=DemoAdversary(),
         assessor=DemoWeaponAssessor(),
         weapon=good,
+        target=target,
     )
 
     run = runner.run()
@@ -168,3 +167,16 @@ def test_preflight_passes_good_weapon() -> None:
     assert run.weapon_assessment.proceed is True
     assert run.weapon_assessment.quality_score >= 0.5
     assert len(run.iterations) == 4  # full loop ran
+
+
+def test_run_records_target() -> None:
+    """FluxGateRun records the target passed to the runner."""
+    target = Target(title="Task endpoints", endpoints=["POST /tasks", "PATCH /tasks/{id}"])
+    runner = FluxGateRunner(
+        executor=DeterministicLocalExecutor(InMemoryTaskAPI()),
+        operator=DemoOperator(),
+        adversary=DemoAdversary(),
+        target=target,
+    )
+    run = runner.run()
+    assert run.target == target

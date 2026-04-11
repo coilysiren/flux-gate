@@ -14,6 +14,7 @@ from .models import (
     NaturalLanguageScenario,
     Scenario,
     ScenarioStep,
+    Target,
     Weapon,
     WeaponAssessment,
 )
@@ -89,7 +90,7 @@ class WeaponAssessor(Protocol):
     all iterations and returns a blocked merge gate.
     """
 
-    def assess(self, weapon: Weapon) -> WeaponAssessment: ...
+    def assess(self, weapon: Weapon, target: Target | None) -> WeaponAssessment: ...
 
 
 # Shared steps and assertions for the demo authorization scenario.
@@ -267,7 +268,7 @@ class DemoWeaponAssessor:
     _MIN_CRITERION_LEN = 20
     _STATUS_CODE_RE = re.compile(r"\b[1-5]\d{2}\b")
 
-    def assess(self, weapon: Weapon) -> WeaponAssessment:
+    def assess(self, weapon: Weapon, target: Target | None) -> WeaponAssessment:
         issues: list[str] = []
         suggestions: list[str] = []
         score = 1.0
@@ -275,23 +276,21 @@ class DemoWeaponAssessor:
         for criterion in weapon.blockers:
             if len(criterion.strip()) < self._MIN_CRITERION_LEN:
                 issues.append(
-                    f"Property too vague (< {self._MIN_CRITERION_LEN} chars): {criterion!r}"
+                    f"Blocker too vague (< {self._MIN_CRITERION_LEN} chars): {criterion!r}"
                 )
                 suggestions.append(
                     "Specify expected status codes, fields, or observable behaviour."
                 )
                 score -= 0.3
 
-        if not weapon.target_endpoints:
-            issues.append("No target_endpoints specified.")
+        if target is None or not target.endpoints:
+            issues.append("No target endpoints specified.")
             suggestions.append("List the endpoints the weapon covers (e.g. 'PATCH /tasks/{id}').")
             score -= 0.2
 
         has_status_code = any(self._STATUS_CODE_RE.search(c) for c in weapon.blockers)
         if not has_status_code:
-            suggestions.append(
-                "Consider adding expected HTTP status codes to must_hold properties."
-            )
+            suggestions.append("Consider adding expected HTTP status codes to blockers.")
             score -= 0.1
 
         quality_score = round(max(0.0, score), 4)
