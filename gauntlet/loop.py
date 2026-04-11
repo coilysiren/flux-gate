@@ -204,7 +204,7 @@ def _build_risk_report(
         {evidence for finding in all_findings for evidence in finding.evidence}
     )
     unexplored_surfaces = _derive_unexplored_surfaces(all_findings)
-    confidence_score = _confidence_score(all_findings)
+    confidence_score = _confidence_score(records, coverage)
     risk_level = _risk_level(all_findings)
 
     clearance = _build_clearance(holdout_results, clearance_threshold) if holdout_results else None
@@ -259,11 +259,44 @@ def _derive_unexplored_surfaces(findings: list[Finding]) -> list[str]:
     return sorted({surface for finding in findings for surface in finding.next_targets})
 
 
-def _confidence_score(findings: list[Finding]) -> float:
-    if not findings:
-        return 0.9
-    average_finding_confidence = sum(finding.confidence for finding in findings) / len(findings)
-    return round(max(0.0, 1.0 - average_finding_confidence), 2)
+def _confidence_score(records: list[IterationRecord], coverage: list[str]) -> float:
+    """Coverage confidence: how thoroughly the attack surface was explored.
+
+    Composed of three signals:
+    - Plan diversity: distinct attack categories relative to iterations run.
+    - Surface exploration depth: unique endpoints hit vs endpoints targeted.
+    - Exploration completeness: next_targets flagged by findings but not yet covered.
+    """
+    if not records:
+        return 0.0
+
+    # Plan diversity: distinct attack categories relative to iterations run
+    all_plans = [plan for record in records for plan in record.plans]
+    distinct_categories = len({plan.category for plan in all_plans}) if all_plans else 0
+    plan_diversity = min(1.0, distinct_categories / len(records))
+
+    # Surface exploration depth: endpoints hit vs endpoints targeted
+    targeted = [
+        endpoint
+        for record in records
+        if record.spec.target
+        for endpoint in record.spec.target.endpoints
+    ]
+    if targeted:
+        surface_depth = min(1.0, len(coverage) / len(targeted))
+    else:
+        surface_depth = min(1.0, len(coverage) / max(1, len(records) * 2))
+
+    # Exploration completeness: next_targets identified by findings but not yet covered
+    all_findings = [finding for record in records for finding in record.findings]
+    next_targets = {surface for finding in all_findings for surface in finding.next_targets}
+    if next_targets:
+        uncovered = len(next_targets - set(coverage))
+        exploration_completeness = 1.0 - (uncovered / len(next_targets))
+    else:
+        exploration_completeness = 1.0
+
+    return round(plan_diversity * 0.35 + surface_depth * 0.35 + exploration_completeness * 0.30, 2)
 
 
 def _risk_level(findings: list[Finding]) -> Literal["low", "medium", "high", "critical"]:

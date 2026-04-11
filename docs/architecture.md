@@ -52,7 +52,7 @@ GauntletRunner.run()
 └── _build_risk_report(records)
       ├── aggregates findings across all iterations
       ├── derives coverage from all executed steps
-      ├── computes confidence_score (1 - avg finding confidence)
+      ├── computes confidence_score (plan diversity + surface depth + exploration completeness)
       ├── derives risk_level from highest finding severity
       ├── evaluates clearance against gate_threshold
       └── returns RiskReport
