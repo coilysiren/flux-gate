@@ -8,9 +8,9 @@ from .models import (
     AssertionResult,
     ExecutionResult,
     Finding,
+    Guard,
+    GuardAssessment,
     HttpRequest,
-    Invariant,
-    InvariantAssessment,
     IterationRecord,
     IterationSpec,
     NaturalLanguageScenario,
@@ -35,24 +35,24 @@ class Adversary(Protocol):
 
 
 class HoldoutEvaluator(Protocol):
-    """Returns structured acceptance scenarios from an Invariant.
+    """Returns structured acceptance scenarios from an Guard.
 
     The Operator never receives these scenarios or their results — this preserves
     the train/test separation described in the dark factory pattern.
     """
 
-    def acceptance_scenarios(self, invariant: Invariant) -> list[Scenario]: ...
+    def acceptance_scenarios(self, guard: Guard) -> list[Scenario]: ...
 
 
 class NaturalLanguageHoldoutEvaluator(Protocol):
-    """Converts Invariant must_hold properties into NaturalLanguageScenario objects.
+    """Converts Guard must_hold properties into NaturalLanguageScenario objects.
 
     Each property becomes a scenario described in plain English.  The Operator
     never sees these properties.  A ``NaturalLanguageEvaluator`` interprets them
     at execution time without glue code.
     """
 
-    def acceptance_scenarios(self, invariant: Invariant) -> list[NaturalLanguageScenario]: ...
+    def acceptance_scenarios(self, guard: Guard) -> list[NaturalLanguageScenario]: ...
 
 
 class NaturalLanguageEvaluator(Protocol):
@@ -68,15 +68,15 @@ class NaturalLanguageEvaluator(Protocol):
     ) -> ExecutionResult: ...
 
 
-class InvariantAssessor(Protocol):
-    """Evaluates an Invariant for quality before the adversarial loop runs.
+class GuardAssessor(Protocol):
+    """Evaluates an Guard for quality before the adversarial loop runs.
 
-    Returns an ``InvariantAssessment`` with a quality score, issues, suggestions,
+    Returns an ``GuardAssessment`` with a quality score, issues, suggestions,
     and a ``proceed`` flag. When ``proceed`` is ``False``, the runner skips
     all iterations and returns a blocked merge gate.
     """
 
-    def assess(self, invariant: Invariant) -> InvariantAssessment: ...
+    def assess(self, guard: Guard) -> GuardAssessment: ...
 
 
 # Shared steps and assertions for the demo authorization scenario.
@@ -163,7 +163,7 @@ class DemoAdversary:
 class DemoHoldoutEvaluator:
     """Returns the cross-user authorization scenario as a structured holdout check."""
 
-    def acceptance_scenarios(self, invariant: Invariant) -> list[Scenario]:
+    def acceptance_scenarios(self, guard: Guard) -> list[Scenario]:
         return [
             Scenario(
                 name="holdout_user_cannot_modify_other_users_task",
@@ -182,15 +182,15 @@ class DemoNaturalLanguageHoldoutEvaluator:
     passes the property text verbatim as the ``verdict``.
     """
 
-    def acceptance_scenarios(self, invariant: Invariant) -> list[NaturalLanguageScenario]:
+    def acceptance_scenarios(self, guard: Guard) -> list[NaturalLanguageScenario]:
         return [
             NaturalLanguageScenario(
                 name=f"criterion_{i}",
-                description=invariant.description,
+                description=guard.description,
                 actors=["userA", "userB"],
                 verdict=criterion,
             )
-            for i, criterion in enumerate(invariant.must_hold)
+            for i, criterion in enumerate(guard.must_hold)
         ]
 
 
@@ -240,10 +240,10 @@ class DemoNaturalLanguageEvaluator:
         )
 
 
-class DemoInvariantAssessor:
-    """Heuristic invariant assessor for use without an LLM.
+class DemoGuardAssessor:
+    """Heuristic guard assessor for use without an LLM.
 
-    Scores an Invariant based on:
+    Scores an Guard based on:
     - must_hold property length  (short properties score low)
     - presence of specific HTTP status codes in properties  (score high)
     - presence of target_endpoints  (score high)
@@ -254,12 +254,12 @@ class DemoInvariantAssessor:
     _MIN_CRITERION_LEN = 20
     _STATUS_CODE_RE = re.compile(r"\b[1-5]\d{2}\b")
 
-    def assess(self, invariant: Invariant) -> InvariantAssessment:
+    def assess(self, guard: Guard) -> GuardAssessment:
         issues: list[str] = []
         suggestions: list[str] = []
         score = 1.0
 
-        for criterion in invariant.must_hold:
+        for criterion in guard.must_hold:
             if len(criterion.strip()) < self._MIN_CRITERION_LEN:
                 issues.append(
                     f"Property too vague (< {self._MIN_CRITERION_LEN} chars): {criterion!r}"
@@ -269,14 +269,12 @@ class DemoInvariantAssessor:
                 )
                 score -= 0.3
 
-        if not invariant.target_endpoints:
+        if not guard.target_endpoints:
             issues.append("No target_endpoints specified.")
-            suggestions.append(
-                "List the endpoints the invariant covers (e.g. 'PATCH /tasks/{id}')."
-            )
+            suggestions.append("List the endpoints the guard covers (e.g. 'PATCH /tasks/{id}').")
             score -= 0.2
 
-        has_status_code = any(self._STATUS_CODE_RE.search(c) for c in invariant.must_hold)
+        has_status_code = any(self._STATUS_CODE_RE.search(c) for c in guard.must_hold)
         if not has_status_code:
             suggestions.append(
                 "Consider adding expected HTTP status codes to must_hold properties."
@@ -284,7 +282,7 @@ class DemoInvariantAssessor:
             score -= 0.1
 
         quality_score = round(max(0.0, score), 4)
-        return InvariantAssessment(
+        return GuardAssessment(
             quality_score=quality_score,
             issues=issues,
             suggestions=suggestions,

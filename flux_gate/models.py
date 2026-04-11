@@ -98,8 +98,8 @@ class Finding(FluxGateModel):
     evidence: list[str] = Field(default_factory=list)
 
 
-class Invariant(FluxGateModel):
-    """Engineer-authored invariant that drives the adversarial loop.
+class Guard(FluxGateModel):
+    """Engineer-authored guard that drives the adversarial loop.
 
     ``description`` is given to the Operator to guide probe scenario generation.
     ``must_hold`` are given only to the HoldoutEvaluator — the Operator
@@ -112,11 +112,11 @@ class Invariant(FluxGateModel):
     target_endpoints: list[str] = Field(default_factory=list)
 
 
-class InvariantAssessment(FluxGateModel):
-    """Result of a preflight quality check on an Invariant.
+class GuardAssessment(FluxGateModel):
+    """Result of a preflight quality check on an Guard.
 
     When ``proceed`` is ``False``, the runner returns early without executing
-    any iterations. The ``issues`` list explains why the invariant was rejected;
+    any iterations. The ``issues`` list explains why the guard was rejected;
     ``suggestions`` offers actionable fixes.
     """
 
@@ -133,7 +133,7 @@ class IterationSpec(FluxGateModel):
     operator_prompt: str
     adversary_prompt: str
     tier: int = 0
-    invariant: Invariant | None = None
+    guard: Guard | None = None
 
 
 class IterationRecord(FluxGateModel):
@@ -166,8 +166,8 @@ class RiskReport(FluxGateModel):
 
 
 class FluxGateRun(FluxGateModel):
-    invariant: Invariant | None = None
+    guard: Guard | None = None
     iterations: list[IterationRecord]
     holdout_results: list[ExecutionResult] = Field(default_factory=list)
-    invariant_assessment: InvariantAssessment | None = None
+    guard_assessment: GuardAssessment | None = None
     risk_report: RiskReport

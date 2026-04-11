@@ -11,8 +11,8 @@ from .auth import ActorsConfig, to_actor_headers
 from .executor import DeterministicLocalExecutor, HttpExecutor
 from .llm import create_adversary, create_operator
 from .loop import FluxGateRunner
-from .models import Invariant
-from .roles import DemoInvariantAssessor
+from .models import Guard
+from .roles import DemoGuardAssessor
 
 _ENV_OPERATOR_TYPE = "FLUX_GATE_OPERATOR_TYPE"
 _ENV_OPERATOR_KEY = "FLUX_GATE_OPERATOR_KEY"
@@ -20,14 +20,14 @@ _ENV_ADVERSARY_TYPE = "FLUX_GATE_ADVERSARY_TYPE"
 _ENV_ADVERSARY_KEY = "FLUX_GATE_ADVERSARY_KEY"
 
 
-def _load_invariants(spec: str) -> list[Invariant]:
-    """Return invariants from a single YAML file or all *.yaml files in a directory."""
+def _load_guards(spec: str) -> list[Guard]:
+    """Return guards from a single YAML file or all *.yaml files in a directory."""
     path = Path(spec)
     if not path.exists():
         return []
     if path.is_dir():
-        return [Invariant(**yaml.safe_load(f.read_text())) for f in sorted(path.glob("*.yaml"))]
-    return [Invariant(**yaml.safe_load(path.read_text()))]
+        return [Guard(**yaml.safe_load(f.read_text())) for f in sorted(path.glob("*.yaml"))]
+    return [Guard(**yaml.safe_load(path.read_text()))]
 
 
 @click.command(
@@ -39,11 +39,11 @@ def _load_invariants(spec: str) -> list[Invariant]:
 )
 @click.argument("url")
 @click.option(
-    "--invariant",
-    default=".flux_gate/invariants",
+    "--guard",
+    default=".flux_gate/guards",
     metavar="FILE_OR_DIR",
     show_default=True,
-    help="Path to an Invariant YAML file, or a directory of YAML files (one invariant per file).",
+    help="Path to an Guard YAML file, or a directory of YAML files (one guard per file).",
 )
 @click.option(
     "--actors",
@@ -66,7 +66,7 @@ def _load_invariants(spec: str) -> list[Invariant]:
     show_default=True,
     help="Stop after the first critical finding.",
 )
-def main(url: str, invariant: str, actors: str, threshold: float, fail_fast: bool) -> None:
+def main(url: str, guard: str, actors: str, threshold: float, fail_fast: bool) -> None:
     operator_type = os.environ.get(_ENV_OPERATOR_TYPE, "")
     operator_key = os.environ.get(_ENV_OPERATOR_KEY, "")
     adversary_type = os.environ.get(_ENV_ADVERSARY_TYPE, "")
@@ -95,7 +95,7 @@ def main(url: str, invariant: str, actors: str, threshold: float, fail_fast: boo
         )
         sys.exit(1)
 
-    invariants = _load_invariants(invariant)
+    guards = _load_guards(guard)
 
     actor_headers: dict[str, dict[str, str]] = {}
     actors_path = Path(actors)
@@ -107,13 +107,13 @@ def main(url: str, invariant: str, actors: str, threshold: float, fail_fast: boo
     executor = DeterministicLocalExecutor(HttpExecutor(url, actor_headers=actor_headers))
 
     blocked = False
-    for inv in invariants or [None]:  # type: ignore[list-item]
+    for inv in guards or [None]:  # type: ignore[list-item]
         runner = FluxGateRunner(
             executor=executor,
             operator=operator,
             adversary=adversary,
-            assessor=DemoInvariantAssessor() if inv else None,
-            invariant=inv,
+            assessor=DemoGuardAssessor() if inv else None,
+            guard=inv,
             gate_threshold=threshold,
             fail_fast_tier=0 if fail_fast else None,
         )

@@ -7,8 +7,8 @@ from .models import (
     ExecutionResult,
     Finding,
     FluxGateRun,
-    Invariant,
-    InvariantAssessment,
+    Guard,
+    GuardAssessment,
     IterationRecord,
     IterationSpec,
     MergeGate,
@@ -16,8 +16,8 @@ from .models import (
 )
 from .roles import (
     Adversary,
+    GuardAssessor,
     HoldoutEvaluator,
-    InvariantAssessor,
     NaturalLanguageEvaluator,
     NaturalLanguageHoldoutEvaluator,
     Operator,
@@ -70,8 +70,8 @@ class FluxGateRunner:
         holdout_evaluator: HoldoutEvaluator | None = None,
         nl_holdout_evaluator: NaturalLanguageHoldoutEvaluator | None = None,
         nl_evaluator: NaturalLanguageEvaluator | None = None,
-        assessor: InvariantAssessor | None = None,
-        invariant: Invariant | None = None,
+        assessor: GuardAssessor | None = None,
+        guard: Guard | None = None,
         gate_threshold: float = 0.90,
         fail_fast_tier: int | None = None,
     ) -> None:
@@ -82,25 +82,25 @@ class FluxGateRunner:
         self._nl_holdout_evaluator = nl_holdout_evaluator
         self._nl_evaluator = nl_evaluator
         self._assessor = assessor
-        self._invariant = invariant
+        self._guard = guard
         self._gate_threshold = gate_threshold
         self._fail_fast_tier = fail_fast_tier
 
     def run(self, iterations: list[IterationSpec] | None = None) -> FluxGateRun:
         specs = iterations or build_default_iteration_specs()
 
-        # Preflight: assess invariant quality before running any iterations.
-        invariant_assessment: InvariantAssessment | None = None
-        if self._assessor is not None and self._invariant is not None:
-            invariant_assessment = self._assessor.assess(self._invariant)
-            if not invariant_assessment.proceed:
-                return self._blocked_by_preflight(invariant_assessment)
+        # Preflight: assess guard quality before running any iterations.
+        guard_assessment: GuardAssessment | None = None
+        if self._assessor is not None and self._guard is not None:
+            guard_assessment = self._assessor.assess(self._guard)
+            if not guard_assessment.proceed:
+                return self._blocked_by_preflight(guard_assessment)
 
-        # Inject invariant into each iteration so the Operator can read
-        # spec.invariant.description — but never must_hold, which
+        # Inject guard into each iteration so the Operator can read
+        # spec.guard.description — but never must_hold, which
         # is only passed to the holdout evaluators below.
-        if self._invariant:
-            specs = [s.model_copy(update={"invariant": self._invariant}) for s in specs]
+        if self._guard:
+            specs = [s.model_copy(update={"guard": self._guard}) for s in specs]
 
         records: list[IterationRecord] = []
         for spec in specs:
@@ -125,43 +125,43 @@ class FluxGateRunner:
         # Holdout scenarios are executed after the probe loop and their results
         # are never fed back to the Operator or Adversary.
         holdout_results: list[ExecutionResult] = []
-        if self._invariant is not None:
+        if self._guard is not None:
             if self._holdout_evaluator is not None:
-                for scenario in self._holdout_evaluator.acceptance_scenarios(self._invariant):
+                for scenario in self._holdout_evaluator.acceptance_scenarios(self._guard):
                     holdout_results.append(self._executor.run_scenario(scenario))
 
             if self._nl_holdout_evaluator is not None and self._nl_evaluator is not None:
-                nl_scenarios = self._nl_holdout_evaluator.acceptance_scenarios(self._invariant)
+                nl_scenarios = self._nl_holdout_evaluator.acceptance_scenarios(self._guard)
                 for nl_scenario in nl_scenarios:
                     holdout_results.append(self._nl_evaluator.evaluate(nl_scenario, self._executor))
 
         return FluxGateRun(
-            invariant=self._invariant,
+            guard=self._guard,
             iterations=records,
             holdout_results=holdout_results,
-            invariant_assessment=invariant_assessment,
+            guard_assessment=guard_assessment,
             risk_report=_build_risk_report(records, holdout_results, self._gate_threshold),
         )
 
-    def _blocked_by_preflight(self, assessment: InvariantAssessment) -> FluxGateRun:
+    def _blocked_by_preflight(self, assessment: GuardAssessment) -> FluxGateRun:
         rationale = (
-            f"Invariant quality score {assessment.quality_score:.0%} is too low to proceed. "
+            f"Guard quality score {assessment.quality_score:.0%} is too low to proceed. "
             f"Issues: {'; '.join(assessment.issues) or 'none'}."
         )
         return FluxGateRun(
-            invariant=self._invariant,
+            guard=self._guard,
             iterations=[],
             holdout_results=[],
-            invariant_assessment=assessment,
+            guard_assessment=assessment,
             risk_report=RiskReport(
                 confidence_score=0.0,
                 risk_level="low",
-                summary=["Run blocked by preflight invariant assessment."],
+                summary=["Run blocked by preflight guard assessment."],
                 confirmed_failures=[],
                 suspicious_patterns=[],
                 unexplored_surfaces=[],
                 coverage=[],
-                conclusion="Run blocked: invariant quality score below threshold.",
+                conclusion="Run blocked: guard quality score below threshold.",
                 merge_gate=MergeGate(
                     passed=False,
                     holdout_satisfaction_score=0.0,

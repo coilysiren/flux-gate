@@ -1,14 +1,14 @@
 from flux_gate import (
     DemoAdversary,
+    DemoGuardAssessor,
     DemoHoldoutEvaluator,
-    DemoInvariantAssessor,
     DemoNaturalLanguageEvaluator,
     DemoNaturalLanguageHoldoutEvaluator,
     DemoOperator,
     DeterministicLocalExecutor,
     FluxGateRunner,
+    Guard,
     InMemoryTaskAPI,
-    Invariant,
 )
 
 
@@ -45,8 +45,8 @@ def test_demo_scenario_surfaces_authz_failure() -> None:
 
 
 def test_nl_holdout_gate_blocks_failing_api() -> None:
-    """NaturalLanguageScenario path: must_hold properties are parsed from the invariant."""
-    inv = Invariant(
+    """NaturalLanguageScenario path: must_hold properties are parsed from the guard."""
+    inv = Guard(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
         must_hold=["A PATCH by a non-owner is rejected with 403"],
@@ -59,7 +59,7 @@ def test_nl_holdout_gate_blocks_failing_api() -> None:
         adversary=DemoAdversary(),
         nl_holdout_evaluator=DemoNaturalLanguageHoldoutEvaluator(),
         nl_evaluator=DemoNaturalLanguageEvaluator(),
-        invariant=inv,
+        guard=inv,
         gate_threshold=0.90,
     )
 
@@ -73,7 +73,7 @@ def test_nl_holdout_gate_blocks_failing_api() -> None:
 
 
 def test_holdout_gate_blocks_failing_api() -> None:
-    inv = Invariant(
+    inv = Guard(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
         must_hold=["A PATCH by a non-owner is rejected with 403"],
@@ -85,13 +85,13 @@ def test_holdout_gate_blocks_failing_api() -> None:
         operator=DemoOperator(),
         adversary=DemoAdversary(),
         holdout_evaluator=DemoHoldoutEvaluator(),
-        invariant=inv,
+        guard=inv,
         gate_threshold=0.90,
     )
 
     run = runner.run()
 
-    assert run.invariant == inv
+    assert run.guard == inv
     assert len(run.holdout_results) == 1
     assert run.holdout_results[0].satisfaction_score == 0.0  # 0/2 assertions passed
     assert run.risk_report.merge_gate is not None
@@ -118,9 +118,9 @@ def test_fail_fast_tier_stops_early_on_critical_finding() -> None:
     assert any(f.severity == "critical" for f in run.iterations[0].findings)
 
 
-def test_preflight_blocks_vague_invariant() -> None:
-    """DemoInvariantAssessor rejects an invariant whose must_hold properties are too short."""
-    vague = Invariant(
+def test_preflight_blocks_vague_guard() -> None:
+    """DemoGuardAssessor rejects an guard whose must_hold properties are too short."""
+    vague = Guard(
         title="Make it secure",
         description="It should be secure.",
         must_hold=["secure", "no bugs"],  # both under 20 chars
@@ -131,23 +131,23 @@ def test_preflight_blocks_vague_invariant() -> None:
         executor=DeterministicLocalExecutor(InMemoryTaskAPI()),
         operator=DemoOperator(),
         adversary=DemoAdversary(),
-        assessor=DemoInvariantAssessor(),
-        invariant=vague,
+        assessor=DemoGuardAssessor(),
+        guard=vague,
     )
 
     run = runner.run()
 
     assert run.iterations == []
-    assert run.invariant_assessment is not None
-    assert run.invariant_assessment.proceed is False
-    assert run.invariant_assessment.quality_score < 0.5
+    assert run.guard_assessment is not None
+    assert run.guard_assessment.proceed is False
+    assert run.guard_assessment.quality_score < 0.5
     assert run.risk_report.merge_gate is not None
     assert run.risk_report.merge_gate.recommendation == "block"
 
 
-def test_preflight_passes_good_invariant() -> None:
-    """DemoInvariantAssessor accepts a well-formed invariant and allows the loop to run."""
-    good = Invariant(
+def test_preflight_passes_good_guard() -> None:
+    """DemoGuardAssessor accepts a well-formed guard and allows the loop to run."""
+    good = Guard(
         title="Users cannot modify each other's tasks",
         description="The task API must enforce resource ownership.",
         must_hold=["A PATCH by a non-owner is rejected with 403"],
@@ -158,13 +158,13 @@ def test_preflight_passes_good_invariant() -> None:
         executor=DeterministicLocalExecutor(InMemoryTaskAPI()),
         operator=DemoOperator(),
         adversary=DemoAdversary(),
-        assessor=DemoInvariantAssessor(),
-        invariant=good,
+        assessor=DemoGuardAssessor(),
+        guard=good,
     )
 
     run = runner.run()
 
-    assert run.invariant_assessment is not None
-    assert run.invariant_assessment.proceed is True
-    assert run.invariant_assessment.quality_score >= 0.5
+    assert run.guard_assessment is not None
+    assert run.guard_assessment.proceed is True
+    assert run.guard_assessment.quality_score >= 0.5
     assert len(run.iterations) == 4  # full loop ran

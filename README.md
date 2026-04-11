@@ -48,13 +48,13 @@ Using different providers for each role is intentional — model diversity reduc
 ### CLI
 
 ```
-flux-gate <url> [--invariant FILE_OR_DIR] [--actors FILE] [--threshold N] [--no-fail-fast]
+flux-gate <url> [--guard FILE_OR_DIR] [--actors FILE] [--threshold N] [--no-fail-fast]
 ```
 
 | Argument | Default | Description |
 |---|---|---|
 | `url` | required | Base URL of the running API |
-| `--invariant` | `.flux_gate/invariants` | Path to an [Invariant YAML](#invariants) file, or a directory of YAML files (one invariant per file) |
+| `--guard` | `.flux_gate/guards` | Path to an [Guard YAML](#guards) file, or a directory of YAML files (one guard per file) |
 | `--actors` | `.flux_gate/actors.yaml` | Path to an [actors YAML](#actor-authentication) file |
 | `--threshold` | `0.90` | Holdout satisfaction score required to recommend merge |
 | `--fail-fast` / `--no-fail-fast` | enabled | Stop at the first critical finding; use `--no-fail-fast` to run all iterations |
@@ -62,8 +62,8 @@ flux-gate <url> [--invariant FILE_OR_DIR] [--actors FILE] [--threshold N] [--no-
 ```bash
 flux-gate http://localhost:8000
 flux-gate http://localhost:8000 --no-fail-fast
-flux-gate http://localhost:8000 --invariant /path/to/invariants/ --actors /path/to/actors.yaml
-flux-gate http://localhost:8000 --invariant /path/to/single_invariant.yaml
+flux-gate http://localhost:8000 --guard /path/to/guards/ --actors /path/to/actors.yaml
+flux-gate http://localhost:8000 --guard /path/to/single_guard.yaml
 ```
 
 Output is YAML:
@@ -91,23 +91,23 @@ The CLI discovers them automatically — no flags needed for the common case:
 ```
 your-project/
 ├── .flux_gate/
-│   ├── invariants/            # one YAML file per Invariant — all loaded automatically
+│   ├── guards/            # one YAML file per Guard — all loaded automatically
 │   │   ├── task_ownership.yaml
 │   │   └── task_read_isolation.yaml
 │   └── actors.yaml            # Actor auth — loaded automatically if present
 └── ...
 ```
 
-Override either path with `--invariant FILE_OR_DIR` or `--actors FILE`.
+Override either path with `--guard FILE_OR_DIR` or `--actors FILE`.
 
-### Invariants
+### Guards
 
-An Invariant defines a property the system must maintain under adversarial pressure.
+An Guard defines a property the system must maintain under adversarial pressure.
 The `must_hold` properties are never shown to the Operator — only to the holdout evaluator —
 preserving the train/test separation.
 
 ```yaml
-# .flux_gate/invariants/task_ownership.yaml
+# .flux_gate/guards/task_ownership.yaml
 title: Users cannot modify each other's tasks
 description: >
   The task API must enforce resource ownership. A user who did not create
