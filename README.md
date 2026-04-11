@@ -4,6 +4,8 @@ Flux Gate is a two-agent adversarial loop that infers software correctness by ob
 
 The name comes from the flux gate magnetometer: a sensor that detects weak fields by actively saturating a ferromagnetic core, revealing distortions that passive measurement would miss. Here, the Adversary saturates the system under test across escalating tiers of pressure until hidden failure modes become detectable — then gates promotion on whether any signal came through.
 
+AI-written code can look correct — following conventions, passing linting, reading plausibly — while hiding behavioral failures that only surface under real use. Traditional tests don't catch this because the same agent that wrote the code also wrote the tests, sharing the same blind spots. Flux Gate is built for this: the Adversary assumes the code is broken and generates scenarios the code author never considered, and the `must_hold` properties in each Guard are never shown to the Operator, preserving a real train/test split that prevents the agent from inadvertently writing code that passes by knowing what the tests check.
+
 ## Quick start
 
 Set your LLM credentials, then point Flux Gate at a running API:
