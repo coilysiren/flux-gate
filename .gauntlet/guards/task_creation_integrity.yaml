@@ -1,3 +1,4 @@
+id: task_owner_derived_from_auth
 title: Task owner is set from authentication context, not request body
 description: >
   When a task is created, its owner field must be derived from the authenticated

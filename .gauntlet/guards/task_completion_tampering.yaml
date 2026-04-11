@@ -1,3 +1,4 @@
+id: task_completion_ownership
 title: Non-owners cannot change a task's completed status
 description: >
   The completed flag on a task is a mutating field. A user who did not create

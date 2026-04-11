@@ -101,18 +101,25 @@ class Finding(GauntletModel):
 class WeaponBrief(GauntletModel):
     """Attacker-visible slice of a Weapon.
 
-    Contains only what the Attacker is allowed to see: the weapon title and a
-    plain-English description of the attack surface.  The acceptance criteria
-    (``blockers``) are intentionally absent — they are withheld to preserve the
-    train/test separation and prevent reward-hacking.
+    Contains only what the Attacker is allowed to see: the weapon id, title,
+    and a plain-English description of the attack surface.  The acceptance
+    criteria (``blockers``) are intentionally absent — they are withheld to
+    preserve the train/test separation and prevent reward-hacking.
     """
 
+    id: str | None = None
     title: str
     description: str
 
 
 class Weapon(GauntletModel):
     """Engineer-authored weapon that drives the adversarial loop.
+
+    ``id`` is a stable snake_case identifier (e.g.
+    ``resource_ownership_write_isolation``) used to accumulate failure
+    knowledge across runs.  ``title`` is the human-readable alias (e.g.
+    "Users cannot modify each other's tasks").  Together they let the system
+    correlate findings over time without schema churn.
 
     ``description`` (exposed via ``WeaponBrief``) is given to the Attacker to
     guide probe plan generation.  ``blockers`` are the Weapon's Vitals —
@@ -123,13 +130,14 @@ class Weapon(GauntletModel):
     Use ``Weapon.brief()`` to produce the attacker-safe view.
     """
 
+    id: str | None = None
     title: str
     description: str
     blockers: list[str]
 
     def brief(self) -> WeaponBrief:
         """Return the attacker-safe view of this weapon (no blockers)."""
-        return WeaponBrief(title=self.title, description=self.description)
+        return WeaponBrief(id=self.id, title=self.title, description=self.description)
 
 
 class WeaponAssessment(GauntletModel):

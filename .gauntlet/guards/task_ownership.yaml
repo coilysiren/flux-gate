@@ -1,3 +1,4 @@
+id: resource_ownership_write_isolation
 title: Users cannot modify each other's tasks
 description: >
   The task API must enforce resource ownership. A user who did not create a task

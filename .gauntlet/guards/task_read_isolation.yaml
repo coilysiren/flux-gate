@@ -1,3 +1,4 @@
+id: resource_ownership_read_isolation
 title: Users cannot read each other's tasks
 description: >
   The task API must enforce read isolation. A user who did not create a task
