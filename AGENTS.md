@@ -9,7 +9,7 @@ Developer reference for agents and humans working on this codebase.
 
 ## Git workflow
 
-Commit directly to `main`. Do not open pull requests unless explicitly asked.
+Commit directly to `main` without asking for confirmation. Do not open pull requests unless explicitly asked.
 
 ## Rules
 
