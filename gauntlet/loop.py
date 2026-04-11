@@ -208,7 +208,7 @@ def _build_risk_report(
     )
     confirmed_failures = sorted({finding.issue for finding in all_findings})
     suspicious_patterns = sorted(
-        {evidence for finding in all_findings for evidence in finding.evidence}
+        {item.content for finding in all_findings for item in finding.evidence}
     )
     unexplored_surfaces = _derive_unexplored_surfaces(all_findings)
     confidence_score = _confidence_score(records, coverage)

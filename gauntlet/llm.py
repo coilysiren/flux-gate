@@ -10,6 +10,7 @@ from openai import OpenAI
 
 from .models import (
     Assertion,
+    EvidenceItem,
     ExecutionResult,
     Finding,
     HttpRequest,
@@ -92,7 +93,7 @@ Respond with ONLY a valid JSON object matching this schema exactly:
       "confidence": 0.85,
       "rationale": "explanation of why this is a problem",
       "next_targets": ["area to probe next"],
-      "evidence": ["specific observation from the execution results"],
+      "evidence": [{"kind": "request|response|assertion|note", "content": "specific observation"}],
       "reproduction_steps": [
         "Step 1: POST /tasks as userA to create a task",
         "Step 2: PATCH /tasks/{id} as userB — expect 403, got 200"
@@ -353,7 +354,11 @@ def _parse_findings(
                     confidence=float(f.get("confidence", 0.5)),
                     rationale=f["rationale"],
                     next_targets=f.get("next_targets", []),
-                    evidence=f.get("evidence", []),
+                    evidence=[
+                        EvidenceItem(kind=e["kind"], content=e["content"])
+                        for e in f.get("evidence", [])
+                        if isinstance(e, dict)
+                    ],
                     reproduction_steps=f.get("reproduction_steps", []),
                     traces=traces,
                     violated_blocker=f.get("violated_blocker"),

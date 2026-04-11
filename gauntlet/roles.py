@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Protocol
 from .models import (
     Assertion,
     AssertionResult,
+    EvidenceItem,
     ExecutionResult,
     Finding,
     HttpRequest,
@@ -152,7 +153,10 @@ class DemoInspector:
             if not failed_assertions:
                 continue
 
-            evidence = [f"{a.name}: {a.detail}" for a in failed_assertions]
+            evidence = [
+                EvidenceItem(kind="assertion", content=f"{a.name}: {a.detail}")
+                for a in failed_assertions
+            ]
             reproduction_steps = [
                 f"Step {s.step_index} ({s.user}): {s.request.method} {s.request.path}"
                 + (f" body={s.request.body}" if s.request.body else "")

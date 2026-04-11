@@ -90,13 +90,18 @@ class ExecutionResult(GauntletModel):
         return round(sum(1 for a in self.assertions if a.passed) / len(self.assertions), 4)
 
 
+class EvidenceItem(GauntletModel):
+    kind: Literal["request", "response", "assertion", "note"]
+    content: str
+
+
 class Finding(GauntletModel):
     issue: str
     severity: Literal["low", "medium", "high", "critical"]
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str
     next_targets: list[str] = Field(default_factory=list)
-    evidence: list[str] = Field(default_factory=list)
+    evidence: list[EvidenceItem] = Field(default_factory=list)
     reproduction_steps: list[str] = Field(default_factory=list)
     traces: list[ExecutionStepResult] = Field(default_factory=list)
     violated_blocker: str | None = None
