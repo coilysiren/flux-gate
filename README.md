@@ -32,6 +32,8 @@ pip install flux-gate
 
 ## Usage
 
+For workflow guidance (when to run, how to integrate, how to act on results), see [docs/usage.md](docs/usage.md).
+
 ### LLM configuration
 
 Flux Gate requires one LLM for the Operator role and one for the Adversary role. Configure
@@ -148,8 +150,6 @@ Supported authentication types:
 |---|---|---|
 | `bearer` | `token_env` | `Authorization: Bearer <$token_env>` |
 | `api_key` | `header`, `key_env` | `<header>: <$key_env>` |
-
----
 
 ## Core Model
 
