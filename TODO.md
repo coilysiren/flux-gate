@@ -98,12 +98,6 @@ Create a clean README with: hook, demo, quickstart, example output. The README i
 
 remove the section in TODO.md about this, then create a git commit the literal text above, be aware that I'm performing multiple agentic pull requests on this same codebase at the same time.
 
-Expose attack primitives as pluggable "weapons". Design this early so contributors can extend the system without touching core logic. This is key to long-term growth.
-
----
-
-remove the section in TODO.md about this, then create a git commit the literal text above, be aware that I'm performing multiple agentic pull requests on this same codebase at the same time.
-
 Optimize for deterministic, repeatable demo runs. Every demo should produce the same results given the same input. This builds trust and avoids confusion.
 
 ---
