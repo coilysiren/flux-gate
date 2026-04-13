@@ -1,0 +1,13 @@
+id: semantic_conflict
+title: Contradictory or logically impossible operations are rejected
+description: >
+  The API must enforce business-logic invariants beyond simple schema
+  validation. Operations that are individually well-formed but semantically
+  contradictory should fail — for example, assigning a task to a user who
+  does not exist, setting a due date in the past, or creating circular
+  dependencies. The attack surface is any operation whose correctness
+  depends on domain rules rather than just field types.
+blockers:
+  - A request that violates a domain invariant is rejected with 409 or 422, not silently accepted
+  - The resource is not modified when a semantically invalid operation is rejected
+  - Error responses describe the violated business rule, not just a generic validation error

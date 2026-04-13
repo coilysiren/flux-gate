@@ -1,0 +1,6 @@
+title: Task CRUD endpoints
+endpoints:
+  - POST /tasks
+  - GET /tasks/{id}
+  - PATCH /tasks/{id}
+  - GET /tasks
