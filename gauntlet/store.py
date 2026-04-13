@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from .models import Plan
+from .models import Finding, Plan
 
 
 class PlanStore:
@@ -55,3 +55,41 @@ class PlanStore:
                 self.save(stamped)
                 result.append(stamped)
         return result
+
+
+class FindingsStore:
+    """Persists findings to disk indexed by weapon ID.
+
+    Findings are stored at ``{root}/{weapon_id}/{issue}.yaml``.  This enables
+    knowledge accumulation across runs: successful attacks, surprising behaviors,
+    and confirmed failures are all keyed to the weapon that produced them.
+    """
+
+    def __init__(self, root: str | Path = ".gauntlet/findings") -> None:
+        self._root = Path(root)
+
+    def load(self, weapon_id: str) -> list[Finding]:
+        """Return all stored findings for a weapon."""
+        weapon_dir = self._root / weapon_id
+        if not weapon_dir.exists():
+            return []
+        findings: list[Finding] = []
+        for path in sorted(weapon_dir.glob("*.yaml")):
+            data = yaml.safe_load(path.read_text())
+            findings.append(Finding(**data))
+        return findings
+
+    def save(self, finding: Finding) -> None:
+        """Persist a finding to disk. ``finding.weapon_id`` must be set."""
+        if not finding.weapon_id:
+            raise ValueError(f"Finding {finding.issue!r} has no weapon_id; cannot persist.")
+        weapon_dir = self._root / finding.weapon_id
+        weapon_dir.mkdir(parents=True, exist_ok=True)
+        path = weapon_dir / f"{finding.issue}.yaml"
+        path.write_text(yaml.dump(finding.model_dump(), sort_keys=False, allow_unicode=True))
+
+    def save_all(self, findings: list[Finding]) -> None:
+        """Persist multiple findings, skipping any without a weapon_id."""
+        for finding in findings:
+            if finding.weapon_id:
+                self.save(finding)

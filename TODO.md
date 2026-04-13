@@ -12,12 +12,6 @@ Keep the 4-iteration ladder but explicitly define its intent. Label them as base
 
 remove the section in TODO.md about this, then create a git commit the literal text above
 
-Use weapons as the primary index for knowledge accumulation. Attach all findings, successful attacks, and surprising behaviors to weapon IDs. This avoids premature taxonomy while still enabling reuse.
-
----
-
-remove the section in TODO.md about this, then create a git commit the literal text above
-
 Group weapons under the concept of an “Arsenal.” This aligns with the existing metaphor and feels more natural than “policy packs.” Example: “Run Gauntlet with the default authz arsenal.”
 
 ---

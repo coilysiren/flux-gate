@@ -10,6 +10,7 @@ gauntlet/
 ├── executor.py  # Api protocol + HttpExecutor + InMemoryTaskAPI + Drone
 ├── llm.py       # LLMAttacker and LLMInspector backed by OpenAI or Anthropic
 ├── loop.py      # GauntletRunner orchestration + risk report assembly
+├── store.py     # PlanStore and FindingsStore — disk-backed knowledge indexed by weapon ID
 └── cli.py       # Click entry point — reads env vars, loads config, runs GauntletRunner
 ```
 
@@ -19,7 +20,8 @@ Nothing imports from `loop.py` or `cli.py` except `__init__.py`. Dependency orde
 models  ←  auth
 models  ←  roles
 models  ←  executor
-models + roles + executor  ←  loop
+models  ←  store
+models + roles + executor + store  ←  loop
 models + auth + roles + executor + llm + loop  ←  cli
 ```
 

@@ -119,6 +119,8 @@ class GauntletRunner:
                 plans = self._plan_store.deduplicate(plans, self._weapon.id)
             execution_results = [self._drone.run_plan(plan) for plan in plans]
             findings = self._inspector.analyze(spec, execution_results)
+            if self._weapon and self._weapon.id:
+                findings = [f.model_copy(update={"weapon_id": self._weapon.id}) for f in findings]
             records.append(
                 IterationRecord(
                     spec=spec,

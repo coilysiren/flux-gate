@@ -32,7 +32,7 @@ from .roles import (
     DemoNaturalLanguageVitals,
     DemoWeaponAssessor,
 )
-from .store import PlanStore
+from .store import FindingsStore, PlanStore
 
 __all__ = [
     "Adapter",
@@ -52,6 +52,7 @@ __all__ = [
     "ExecutionResult",
     "ExecutionStepResult",
     "Finding",
+    "FindingsStore",
     "GauntletRun",
     "GauntletRunner",
     "HttpApi",

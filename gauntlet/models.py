@@ -118,6 +118,7 @@ class Finding(GauntletModel):
     severity: Literal["low", "medium", "high", "critical"]
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str
+    weapon_id: str | None = None
     next_targets: list[str] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)
     reproduction_steps: list[str] = Field(default_factory=list)
