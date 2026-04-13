@@ -1,11 +1,5 @@
 # TODO
 
-Internally generalize request/response into Action/Observation. The attacker produces actions, adapters execute them, and inspectors evaluate observations. This enables expansion without changing the mental model.
-
----
-
-remove the section in TODO.md about this, then create a git commit the literal text above
-
 Use weapons as the primary index for knowledge accumulation. Attach all findings, successful attacks, and surprising behaviors to weapon IDs. This avoids premature taxonomy while still enabling reuse.
 
 ---

@@ -5,7 +5,7 @@ from typing import Any
 
 import requests as http
 
-from ..models import HttpRequest, HttpResponse
+from ..models import Action, HttpRequest, HttpResponse, Observation
 
 
 class HttpApi:
@@ -49,6 +49,10 @@ class HttpApi:
             body = {"_raw": resp.text}
         return HttpResponse(status_code=resp.status_code, body=body)
 
+    def execute(self, user: str, action: Action) -> Observation:
+        response = self.send(user, action.to_http_request())
+        return Observation.from_http_response(response)
+
 
 class InMemoryHttpApi:
     """Demo REST API with an intentional authorization flaw."""
@@ -65,6 +69,10 @@ class InMemoryHttpApi:
         if request.method == "PATCH" and request.path.startswith("/tasks/"):
             return self._patch_task(user, request)
         return HttpResponse(status_code=404, body={"error": "not_found"})
+
+    def execute(self, user: str, action: Action) -> Observation:
+        response = self.send(user, action.to_http_request())
+        return Observation.from_http_response(response)
 
     def _create_task(self, user: str, request: HttpRequest) -> HttpResponse:
         task_id = self._next_id

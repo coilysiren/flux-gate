@@ -20,6 +20,48 @@ class HttpResponse(GauntletModel):
     body: dict[str, Any] = Field(default_factory=dict)
 
 
+class Action(GauntletModel):
+    """Generalized action produced by an attacker and executed by an adapter.
+
+    Wraps a concrete implementation such as ``HttpRequest``.  Future action
+    types (CLI commands, WebDriver interactions) will use the same envelope so
+    the adversarial loop stays surface-agnostic.
+    """
+
+    kind: Literal["http"] = "http"
+    http_request: HttpRequest | None = None
+
+    @staticmethod
+    def from_http_request(request: HttpRequest) -> Action:
+        return Action(kind="http", http_request=request)
+
+    def to_http_request(self) -> HttpRequest:
+        if self.http_request is None:
+            raise ValueError("Action does not contain an HttpRequest")
+        return self.http_request
+
+
+class Observation(GauntletModel):
+    """Generalized observation returned by an adapter after executing an action.
+
+    Wraps a concrete implementation such as ``HttpResponse``.  Future
+    observation types (CLI output, page state) will use the same envelope so
+    inspectors can evaluate results without coupling to a specific surface.
+    """
+
+    kind: Literal["http"] = "http"
+    http_response: HttpResponse | None = None
+
+    @staticmethod
+    def from_http_response(response: HttpResponse) -> Observation:
+        return Observation(kind="http", http_response=response)
+
+    def to_http_response(self) -> HttpResponse:
+        if self.http_response is None:
+            raise ValueError("Observation does not contain an HttpResponse")
+        return self.http_response
+
+
 class Assertion(GauntletModel):
     kind: Literal["status_code", "rule"]
     expected: Any | None = None

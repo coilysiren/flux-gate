@@ -5,9 +5,16 @@
 ```
 gauntlet/
 ├── models.py    # all Pydantic data models — the shared vocabulary
+│                #   includes Action/Observation (surface-agnostic wrappers
+│                #   around HttpRequest/HttpResponse and future action types)
 ├── auth.py      # user authentication config (BearerAuth, ApiKeyAuth, UsersConfig)
 ├── roles.py     # Attacker, Inspector, HoldoutVitals, WeaponAssessor protocols + demo impls
-├── executor.py  # Api protocol + HttpExecutor + InMemoryTaskAPI + Drone
+├── adapters/    # Adapter protocol + concrete implementations
+│   ├── __init__.py   # Adapter protocol (send + execute)
+│   ├── http.py       # HttpApi (real HTTP) + InMemoryHttpApi (demo)
+│   ├── cli.py        # CliAdapter (stub)
+│   └── webdriver.py  # WebDriverAdapter (stub)
+├── executor.py  # Drone — runs plans via Adapter.execute(Action) → Observation
 ├── llm.py       # LLMAttacker and LLMInspector backed by OpenAI or Anthropic
 ├── loop.py      # GauntletRunner orchestration + risk report assembly
 └── cli.py       # Click entry point — reads env vars, loads config, runs GauntletRunner
@@ -17,8 +24,9 @@ Nothing imports from `loop.py` or `cli.py` except `__init__.py`. Dependency orde
 
 ```
 models  ←  auth
+models  ←  adapters (http, cli, webdriver, __init__)
 models  ←  roles
-models  ←  executor
+models + adapters  ←  executor
 models + roles + executor  ←  loop
 models + auth + roles + executor + llm + loop  ←  cli
 ```
@@ -37,7 +45,8 @@ GauntletRunner.run()
 │   │
 │   ├── Drone.run_plan(plan) × N
 │   │     ├── resolves path templates from prior step responses
-│   │     ├── calls Api.send(user, request)
+│   │     ├── wraps HttpRequest in Action, calls Adapter.execute(user, action)
+│   │     ├── unwraps Observation back to HttpResponse
 │   │     └── evaluates assertions → []AssertionResult
 │   │         returns ExecutionResult
 │   │
@@ -94,6 +103,14 @@ the integration surface small and avoids inheritance coupling.
 **Why separate auth.py?** User credentials involve secret resolution from env
 vars. Isolating this in `auth.py` keeps the rest of the codebase free of
 secret-handling logic and makes the boundary clear.
+
+**Why Action/Observation instead of passing HttpRequest/HttpResponse directly?**
+The adversarial loop should not be coupled to a single execution surface.
+Action wraps an HttpRequest today (and CLI commands or WebDriver interactions
+tomorrow); Observation wraps the corresponding response.  The Drone converts
+between the two layers so the rest of the system stays surface-agnostic.
+Adapters implement both ``send`` (HTTP shorthand) and ``execute``
+(Action/Observation) so existing callers keep working.
 
 **Why LLM providers are configurable per-role?** The Attacker and Inspector
 can use different providers (e.g., GPT-4 vs Claude) so users can mix strengths

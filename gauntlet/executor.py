@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .adapters import Adapter
 from .models import (
+    Action,
     Assertion,
     AssertionResult,
     ExecutionResult,
@@ -19,7 +20,9 @@ class Drone:
         context: dict[str, object] = {}
         for index, step in enumerate(plan.steps, start=1):
             request = step.request.model_copy(update={"path": step.request.path.format(**context)})
-            response = self._sut.send(step.user, request)
+            action = Action.from_http_request(request)
+            observation = self._sut.execute(step.user, action)
+            response = observation.to_http_response()
             step_results.append(
                 ExecutionStepResult(
                     step_index=index,

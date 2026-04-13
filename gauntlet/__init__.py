@@ -4,6 +4,7 @@ from .executor import Drone
 from .llm import LLMAttacker, LLMInspector, create_attacker, create_inspector
 from .loop import GauntletRunner, build_default_iteration_specs
 from .models import (
+    Action,
     Assertion,
     AssertionResult,
     Clearance,
@@ -16,6 +17,7 @@ from .models import (
     IterationRecord,
     IterationSpec,
     NaturalLanguagePlan,
+    Observation,
     Plan,
     PlanStep,
     RiskReport,
@@ -35,6 +37,7 @@ from .roles import (
 from .store import PlanStore
 
 __all__ = [
+    "Action",
     "Adapter",
     "ApiKeyAuth",
     "Assertion",
@@ -63,6 +66,7 @@ __all__ = [
     "LLMAttacker",
     "LLMInspector",
     "NaturalLanguagePlan",
+    "Observation",
     "Plan",
     "PlanStep",
     "PlanStore",
