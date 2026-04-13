@@ -12,7 +12,7 @@ from .auth import UsersConfig, to_user_headers
 from .executor import Drone
 from .llm import create_attacker, create_inspector
 from .loop import GauntletRunner
-from .models import ExecutionResult, Target, Weapon
+from .models import ExecutionResult, Finding, GauntletRun, Target, Weapon
 from .roles import DemoWeaponAssessor
 
 _ENV_ATTACKER_TYPE = "GAUNTLET_ATTACKER_TYPE"
@@ -145,6 +145,8 @@ def main(url: str, weapon: str, target: str, users: str, threshold: float, fail_
                 click.echo(f"error: {exc}", err=True)
                 sys.exit(1)
 
+            _print_one_line_summary(run)
+
             clearance = run.clearance
             if clearance:
                 label = clearance.recommendation.upper()
@@ -163,6 +165,45 @@ def main(url: str, weapon: str, target: str, users: str, threshold: float, fail_
 
     if blocked:
         sys.exit(1)
+
+
+def _print_one_line_summary(run: GauntletRun) -> None:
+    """Print a one-line summary giving immediate clarity on the run outcome."""
+    clearance = run.clearance
+    if clearance is None:
+        click.echo("PASS — no clearance gate configured")
+        return
+
+    label = clearance.recommendation.upper()
+    all_findings = [f for record in run.iterations for f in record.findings]
+
+    if not all_findings:
+        click.echo(f"{label} — no findings detected")
+        return
+
+    worst = _worst_finding(all_findings)
+    method = _dominant_method(run)
+    blocker_part = f" {worst.violated_blocker} violated" if worst.violated_blocker else ""
+    method_part = f" via unauthorized {method}" if method else ""
+    click.echo(f"{label} —{blocker_part}{method_part}")
+
+
+def _worst_finding(findings: list[Finding]) -> Finding:
+    """Return the finding with the highest severity."""
+    severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    return min(findings, key=lambda f: severity_order.get(f.severity, 4))
+
+
+def _dominant_method(run: GauntletRun) -> str:
+    """Return the most common HTTP method across findings' traces."""
+    methods: list[str] = []
+    for record in run.iterations:
+        for finding in record.findings:
+            for trace in finding.traces:
+                methods.append(trace.request.method)
+    if not methods:
+        return ""
+    return max(set(methods), key=methods.count)
 
 
 def _print_holdout_summary(holdout_results: list[ExecutionResult]) -> None:
