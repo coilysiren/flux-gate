@@ -1,0 +1,13 @@
+id: owasp_broken_auth
+title: "API2: Broken Authentication"
+description: >
+  Test whether authentication mechanisms are correctly implemented. Attackers
+  target token generation, password management, and session handling to
+  impersonate other users. The API should enforce strong authentication on all
+  endpoints, validate tokens properly, and reject expired, tampered, or missing
+  credentials.
+blockers:
+  - Requests with missing or empty authentication tokens are rejected with 401
+  - Requests with expired or malformed tokens are rejected with 401, not treated as valid
+  - Credentials or tokens from one user cannot be replayed or modified to gain access as another user
+  - Password reset or token refresh flows do not leak tokens or allow takeover without proper verification

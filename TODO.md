@@ -66,16 +66,3 @@ remove the section in TODO.md about this, then create a git commit the literal t
 - pypi
 
 actually use it !!!
-
----
-
-owasp top 10 (filtered to the easy ones)
-
-- https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/
-- https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/
-- https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/
-- https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/
-- https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/
-- https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/
-- https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/
-- https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/

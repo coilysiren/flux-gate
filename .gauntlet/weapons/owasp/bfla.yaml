@@ -1,0 +1,12 @@
+id: owasp_bfla
+title: "API5: Broken Function Level Authorization"
+description: >
+  Test whether the API enforces authorization at the function level. Attackers
+  access administrative or privileged endpoints by guessing URLs, changing HTTP
+  methods, or replaying requests intended for higher-privilege roles. The API
+  should verify that the authenticated user's role permits the requested action,
+  not just that the user is authenticated.
+blockers:
+  - A regular user cannot access administrative endpoints (e.g. user management, config changes) and receives 403
+  - Changing the HTTP method on an endpoint (e.g. GET to DELETE) does not bypass authorization checks
+  - Accessing endpoints by guessing predictable admin URL patterns (e.g. /admin/, /api/v1/users/all) returns 403 or 404 for unprivileged users

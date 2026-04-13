@@ -1,0 +1,12 @@
+id: owasp_improper_inventory
+title: "API9: Improper Inventory Management"
+description: >
+  Test whether the API properly manages its inventory of exposed endpoints and
+  versions. Attackers discover and exploit old API versions, undocumented endpoints,
+  debug routes, or shadow APIs that lack current security controls. The API should
+  expose only intended endpoints, retire old versions, and ensure every reachable
+  path is subject to authentication and authorization.
+blockers:
+  - Old or deprecated API versions (e.g. /api/v1/ when /api/v2/ is current) are disabled or enforce the same security controls as the current version
+  - Undocumented or debug endpoints (e.g. /debug, /internal, /test) are not reachable in production
+  - All reachable endpoints require authentication unless explicitly designed to be public

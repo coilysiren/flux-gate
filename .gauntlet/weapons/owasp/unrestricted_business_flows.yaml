@@ -1,0 +1,12 @@
+id: owasp_unrestricted_business_flows
+title: "API6: Unrestricted Access to Sensitive Business Flows"
+description: >
+  Test whether the API restricts access to sensitive business flows that can cause
+  harm when used excessively or in automated fashion. Attackers abuse legitimate
+  functionality at scale -- bulk purchasing, mass account creation, rapid data
+  export, or excessive resource consumption. The API should enforce rate limits,
+  anti-automation controls, and business logic constraints to prevent abuse.
+blockers:
+  - Rapid repeated calls to a sensitive endpoint (e.g. purchase, signup, export) are rate-limited or blocked, not processed indefinitely
+  - Business logic constraints are enforced server-side (e.g. quantity limits, one-per-user rules) and cannot be bypassed by crafting direct API requests
+  - Automated bulk operations that exceed reasonable usage thresholds are detected and rejected

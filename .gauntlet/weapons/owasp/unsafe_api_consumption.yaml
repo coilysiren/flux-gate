@@ -1,0 +1,12 @@
+id: owasp_unsafe_api_consumption
+title: "API10: Unsafe Consumption of APIs"
+description: >
+  Test whether the API safely consumes data from third-party or upstream APIs.
+  Attackers compromise or impersonate integrated services to inject malicious
+  payloads, redirect flows, or exfiltrate data. The API should validate and
+  sanitize all data received from external sources, enforce transport security,
+  and not blindly trust responses from third-party integrations.
+blockers:
+  - Data received from external APIs is validated and sanitized before being stored or returned to users
+  - Redirects from external services are not followed blindly into internal or attacker-controlled destinations
+  - The API does not expose raw upstream error details or credentials in its own responses when an external call fails

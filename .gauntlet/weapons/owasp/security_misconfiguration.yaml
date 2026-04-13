@@ -1,0 +1,13 @@
+id: owasp_security_misconfiguration
+title: "API8: Security Misconfiguration"
+description: >
+  Test whether the API is securely configured. Attackers exploit missing security
+  headers, overly permissive CORS policies, verbose error messages, default
+  credentials, and unnecessary HTTP methods. The API should follow secure defaults,
+  minimize its exposed surface, and avoid leaking implementation details in error
+  responses or headers.
+blockers:
+  - Error responses do not expose stack traces, internal paths, database details, or framework version information
+  - CORS headers do not allow arbitrary origins or credentials from untrusted domains
+  - Unnecessary HTTP methods (e.g. TRACE, OPTIONS returning sensitive data) are disabled or return appropriate errors
+  - Default or sample credentials are not present and do not grant access
