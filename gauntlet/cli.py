@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 import yaml
@@ -19,6 +20,38 @@ _ENV_ATTACKER_TYPE = "GAUNTLET_ATTACKER_TYPE"
 _ENV_ATTACKER_KEY = "GAUNTLET_ATTACKER_KEY"
 _ENV_INSPECTOR_TYPE = "GAUNTLET_INSPECTOR_TYPE"
 _ENV_INSPECTOR_KEY = "GAUNTLET_INSPECTOR_KEY"
+
+_DEFAULT_CONFIG_PATH = ".gauntlet/config.yaml"
+
+_OPTION_DEFAULTS: dict[str, Any] = {
+    "weapon": ".gauntlet/weapons",
+    "target": ".gauntlet/targets",
+    "users": ".gauntlet/users.yaml",
+    "threshold": 0.90,
+    "fail_fast": True,
+}
+
+
+def _load_config_file(path: str | None) -> dict[str, Any]:
+    """Load a YAML config file and return its contents as a dict.
+
+    If *path* is ``None``, the default config path is tried silently.
+    If an explicit *path* is given and the file does not exist, an error is
+    raised via :func:`click.echo`.
+    """
+    if path is None:
+        default = Path(_DEFAULT_CONFIG_PATH)
+        if default.exists():
+            raw: Any = yaml.safe_load(default.read_text())
+            return dict(raw) if isinstance(raw, dict) else {}
+        return {}
+
+    p = Path(path)
+    if not p.exists():
+        click.echo(f"error: config file not found: {path}", err=True)
+        sys.exit(1)
+    raw = yaml.safe_load(p.read_text())
+    return dict(raw) if isinstance(raw, dict) else {}
 
 
 def _load_weapons(spec: str) -> list[Weapon]:
@@ -48,43 +81,92 @@ def _load_targets(spec: str) -> list[Target]:
         "outputs a risk report."
     )
 )
-@click.argument("url")
+@click.argument("url", required=False, default=None)
+@click.option(
+    "--config",
+    "config_path",
+    default=None,
+    metavar="FILE",
+    help=(
+        "Path to a YAML config file. "
+        "Defaults to .gauntlet/config.yaml if it exists. "
+        "CLI flags override values from the config file."
+    ),
+)
 @click.option(
     "--weapon",
-    default=".gauntlet/weapons",
+    default=None,
     metavar="FILE_OR_DIR",
-    show_default=True,
-    help="Path to a Weapon YAML file, or a directory of YAML files (one weapon per file).",
+    help=(
+        "Path to a Weapon YAML file, or a directory of YAML files "
+        "(one weapon per file). [default: .gauntlet/weapons]"
+    ),
 )
 @click.option(
     "--target",
-    default=".gauntlet/targets",
+    default=None,
     metavar="FILE_OR_DIR",
-    show_default=True,
-    help="Path to a Target YAML file, or a directory of YAML files (one target per file).",
+    help=(
+        "Path to a Target YAML file, or a directory of YAML files "
+        "(one target per file). [default: .gauntlet/targets]"
+    ),
 )
 @click.option(
     "--users",
-    default=".gauntlet/users.yaml",
+    default=None,
     metavar="FILE",
-    show_default=True,
-    help="Path to an users YAML file defining per-user authentication.",
+    help=(
+        "Path to an users YAML file defining per-user authentication. "
+        "[default: .gauntlet/users.yaml]"
+    ),
 )
 @click.option(
     "--threshold",
     type=float,
-    default=0.90,
+    default=None,
     metavar="N",
-    show_default=True,
-    help="Holdout satisfaction score required to recommend merge.",
+    help="Holdout satisfaction score required to recommend merge. [default: 0.90]",
 )
 @click.option(
     "--fail-fast/--no-fail-fast",
-    default=True,
-    show_default=True,
-    help="Stop after the first critical finding.",
+    default=None,
+    help="Stop after the first critical finding. [default: True]",
 )
-def main(url: str, weapon: str, target: str, users: str, threshold: float, fail_fast: bool) -> None:
+def main(
+    url: str | None,
+    config_path: str | None,
+    weapon: str | None,
+    target: str | None,
+    users: str | None,
+    threshold: float | None,
+    fail_fast: bool | None,
+) -> None:
+    # --- resolve configuration: defaults < config file < CLI flags ---
+    file_cfg = _load_config_file(config_path)
+
+    # Normalise fail-fast: YAML uses underscore key, CLI uses fail_fast param
+    if "fail-fast" in file_cfg:
+        file_cfg.setdefault("fail_fast", file_cfg.pop("fail-fast"))
+
+    resolved_url: str = url or file_cfg.get("url", "")
+    if not resolved_url:
+        click.echo(
+            "error: URL is required. Provide it as a positional argument or via config file.",
+            err=True,
+        )
+        sys.exit(1)
+
+    def _resolve(name: str, cli_val: Any) -> Any:
+        if cli_val is not None:
+            return cli_val
+        return file_cfg.get(name, _OPTION_DEFAULTS[name])
+
+    weapon_val: str = _resolve("weapon", weapon)
+    target_val: str = _resolve("target", target)
+    users_val: str = _resolve("users", users)
+    threshold_val: float = float(_resolve("threshold", threshold))
+    fail_fast_val: bool = bool(_resolve("fail_fast", fail_fast))
+
     operator_type = os.environ.get(_ENV_ATTACKER_TYPE, "")
     operator_key = os.environ.get(_ENV_ATTACKER_KEY, "")
     adversary_type = os.environ.get(_ENV_INSPECTOR_TYPE, "")
@@ -113,17 +195,17 @@ def main(url: str, weapon: str, target: str, users: str, threshold: float, fail_
         )
         sys.exit(1)
 
-    weapons = _load_weapons(weapon)
-    targets = _load_targets(target)
+    weapons = _load_weapons(weapon_val)
+    targets = _load_targets(target_val)
 
     user_headers: dict[str, dict[str, str]] = {}
-    users_path = Path(users)
+    users_path = Path(users_val)
     if users_path.exists():
         user_headers = to_user_headers(UsersConfig(**yaml.safe_load(users_path.read_text())))
 
     attacker = create_attacker(operator_type, operator_key)
     inspector = create_inspector(adversary_type, adversary_key)
-    executor = Drone(HttpApi(url, user_headers=user_headers))
+    executor = Drone(HttpApi(resolved_url, user_headers=user_headers))
 
     blocked = False
     for inv in weapons or [None]:  # type: ignore[list-item]
@@ -135,8 +217,8 @@ def main(url: str, weapon: str, target: str, users: str, threshold: float, fail_
                 assessor=DemoWeaponAssessor() if inv else None,
                 weapon=inv,
                 target=tgt,
-                clearance_threshold=threshold,
-                fail_fast_tier=0 if fail_fast else None,
+                clearance_threshold=threshold_val,
+                fail_fast_tier=0 if fail_fast_val else None,
             )
 
             try:
