@@ -83,7 +83,7 @@ The `Demo*` classes are reference implementations of each Protocol in `roles.py`
 serialization/deserialization free.
 
 **Why 4 fixed iterations?** v0 trades flexibility for predictability. The four
-goals (baseline → boundary → adversarial → targeted) form a natural escalation
+goals (baseline → boundary → adversarial_misuse → targeted_escalation) form a natural escalation
 ladder that works well for demo purposes. Future versions will make this
 configurable.
 

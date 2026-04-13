@@ -30,16 +30,16 @@ def build_default_iteration_specs() -> list[IterationSpec]:
     return [
         IterationSpec(
             index=1,
-            name="broad_baseline",
-            goal="broad_baseline",
+            name="baseline",
+            goal="baseline",
             tier=0,
             attacker_prompt="Generate diverse CRUD and lifecycle plans.",
             inspector_prompt="Identify anomalies and weak coverage.",
         ),
         IterationSpec(
             index=2,
-            name="boundary_and_guards",
-            goal="boundary_and_guards",
+            name="boundary",
+            goal="boundary",
             tier=1,
             attacker_prompt="Target edge cases, missing fields, and schema drift.",
             inspector_prompt="Escalate guard violations.",
@@ -54,8 +54,8 @@ def build_default_iteration_specs() -> list[IterationSpec]:
         ),
         IterationSpec(
             index=4,
-            name="targeted_followup",
-            goal="targeted_followup",
+            name="targeted_escalation",
+            goal="targeted_escalation",
             tier=3,
             attacker_prompt="Focus only on suspicious areas.",
             inspector_prompt="Finalize the failure model.",

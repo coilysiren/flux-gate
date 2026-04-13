@@ -6,12 +6,6 @@ Internally generalize request/response into Action/Observation. The attacker pro
 
 remove the section in TODO.md about this, then create a git commit the literal text above
 
-Keep the 4-iteration ladder but explicitly define its intent. Label them as baseline, boundary, adversarial misuse, and targeted escalation. This improves interpretability without changing behavior.
-
----
-
-remove the section in TODO.md about this, then create a git commit the literal text above
-
 Use weapons as the primary index for knowledge accumulation. Attach all findings, successful attacks, and surprising behaviors to weapon IDs. This avoids premature taxonomy while still enabling reuse.
 
 ---
