@@ -198,6 +198,8 @@ def _build_risk_report(
     clearance_threshold: float,
 ) -> tuple[RiskReport, Clearance | None]:
     all_findings = [finding for record in records for finding in record.findings]
+    blocker_findings = [f for f in all_findings if not f.is_anomaly]
+    anomaly_findings = [f for f in all_findings if f.is_anomaly]
     coverage = sorted(
         {
             f"{step.request.method} {step.request.path}"
@@ -206,13 +208,14 @@ def _build_risk_report(
             for step in result.steps
         }
     )
-    confirmed_failures = sorted({finding.issue for finding in all_findings})
+    confirmed_failures = sorted({finding.issue for finding in blocker_findings})
     suspicious_patterns = sorted(
-        {item.content for finding in all_findings for item in finding.evidence}
+        {item.content for finding in blocker_findings for item in finding.evidence}
     )
+    anomalies = sorted({finding.issue for finding in anomaly_findings})
     unexplored_surfaces = _derive_unexplored_surfaces(all_findings)
     confidence_score = _confidence_score(records, coverage)
-    risk_level = _risk_level(all_findings)
+    risk_level = _risk_level(blocker_findings)
 
     clearance = _build_clearance(holdout_results, clearance_threshold) if holdout_results else None
 
@@ -223,6 +226,7 @@ def _build_risk_report(
         confirmed_failures=confirmed_failures,
         suspicious_patterns=suspicious_patterns,
         unexplored_surfaces=unexplored_surfaces,
+        anomalies=anomalies,
         coverage=coverage,
         conclusion=_conclusion(risk_level, confirmed_failures),
     )

@@ -124,6 +124,7 @@ class Finding(GauntletModel):
     traces: list[ExecutionStepResult] = Field(default_factory=list)
     violated_blocker: str | None = None
     replay_bundle: ReplayBundle | None = None
+    is_anomaly: bool = False
 
 
 class WeaponBrief(GauntletModel):
@@ -229,6 +230,7 @@ class RiskReport(GauntletModel):
     confirmed_failures: list[str]
     suspicious_patterns: list[str]
     unexplored_surfaces: list[str]
+    anomalies: list[str] = Field(default_factory=list)
     coverage: list[str]
     conclusion: str
 

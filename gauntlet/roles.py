@@ -152,45 +152,127 @@ class DemoInspector:
         findings: list[Finding] = []
         for result in execution_results:
             failed_assertions = [a for a in result.assertions if not a.passed]
-            if not failed_assertions:
-                continue
+            if failed_assertions:
+                evidence = [
+                    EvidenceItem(kind="assertion", content=f"{a.name}: {a.detail}")
+                    for a in failed_assertions
+                ]
+                reproduction_steps = [
+                    f"Step {s.step_index} ({s.user}): {s.request.method} {s.request.path}"
+                    + (f" body={s.request.body}" if s.request.body else "")
+                    + f" → {s.response.status_code}"
+                    for s in result.steps
+                ]
+                violated_blocker = failed_assertions[0].name if failed_assertions else None
+                replay_bundle = ReplayBundle(
+                    steps=[ReplayStep(user=s.user, request=s.request) for s in result.steps]
+                )
+                findings.append(
+                    Finding(
+                        issue="unauthorized_cross_user_modification",
+                        severity="critical",
+                        confidence=0.94,
+                        rationale=(
+                            "A non-owner mutated another user's task during deterministic local "
+                            f"execution in iteration {spec.index}."
+                        ),
+                        next_targets=[
+                            "ownership mutation",
+                            "list endpoint visibility",
+                            "partial update guards",
+                        ],
+                        evidence=evidence,
+                        reproduction_steps=reproduction_steps,
+                        traces=result.steps,
+                        violated_blocker=violated_blocker,
+                        replay_bundle=replay_bundle,
+                    )
+                )
 
-            evidence = [
-                EvidenceItem(kind="assertion", content=f"{a.name}: {a.detail}")
-                for a in failed_assertions
-            ]
-            reproduction_steps = [
-                f"Step {s.step_index} ({s.user}): {s.request.method} {s.request.path}"
-                + (f" body={s.request.body}" if s.request.body else "")
-                + f" → {s.response.status_code}"
-                for s in result.steps
-            ]
-            violated_blocker = failed_assertions[0].name if failed_assertions else None
-            replay_bundle = ReplayBundle(
-                steps=[ReplayStep(user=s.user, request=s.request) for s in result.steps]
-            )
-            findings.append(
-                Finding(
-                    issue="unauthorized_cross_user_modification",
-                    severity="critical",
-                    confidence=0.94,
-                    rationale=(
-                        "A non-owner mutated another user's task during deterministic local "
-                        f"execution in iteration {spec.index}."
+            # Surface anomalies: unexpected behaviors that don't violate a blocker
+            # but may signal issues worth investigating.
+            anomalies = _detect_anomalies(result)
+            for anomaly_evidence, anomaly_description in anomalies:
+                replay_bundle = ReplayBundle(
+                    steps=[ReplayStep(user=s.user, request=s.request) for s in result.steps]
+                )
+                findings.append(
+                    Finding(
+                        issue=anomaly_description,
+                        severity="low",
+                        confidence=0.5,
+                        rationale=(
+                            "Unexpected behavior observed during iteration "
+                            f"{spec.index} that does not map to a known blocker."
+                        ),
+                        evidence=[anomaly_evidence],
+                        reproduction_steps=[
+                            f"Step {s.step_index} ({s.user}): "
+                            f"{s.request.method} {s.request.path}"
+                            + (f" body={s.request.body}" if s.request.body else "")
+                            + f" → {s.response.status_code}"
+                            for s in result.steps
+                        ],
+                        traces=result.steps,
+                        replay_bundle=replay_bundle,
+                        is_anomaly=True,
+                    )
+                )
+        return findings
+
+
+def _detect_anomalies(
+    result: ExecutionResult,
+) -> list[tuple[EvidenceItem, str]]:
+    """Return (evidence, description) pairs for unexpected behaviors in a result.
+
+    Heuristics checked:
+    - A mutating request (POST/PATCH) that succeeds with 200 when the step
+      involves a different user than the resource creator.
+    - A response body containing fields not present in the request body
+      (potential data leakage or over-exposure).
+    """
+    anomalies: list[tuple[EvidenceItem, str]] = []
+
+    for step in result.steps:
+        # Heuristic: mutating request returned 200 where 4xx might be expected
+        if (
+            step.request.method in ("PATCH", "POST")
+            and step.response.status_code == 200
+            and step.request.path != "/tasks"
+        ):
+            anomalies.append(
+                (
+                    EvidenceItem(
+                        kind="note",
+                        content=(
+                            f"Step {step.step_index}: {step.request.method} "
+                            f"{step.request.path} returned 200 — expected 4xx "
+                            f"for a mutating request on an existing resource."
+                        ),
                     ),
-                    next_targets=[
-                        "ownership mutation",
-                        "list endpoint visibility",
-                        "partial update guards",
-                    ],
-                    evidence=evidence,
-                    reproduction_steps=reproduction_steps,
-                    traces=result.steps,
-                    violated_blocker=violated_blocker,
-                    replay_bundle=replay_bundle,
+                    "unexpected_success_on_mutation",
                 )
             )
-        return findings
+
+        # Heuristic: response body has fields not in the request body
+        if step.request.body and step.response.body:
+            extra_fields = set(step.response.body.keys()) - set(step.request.body.keys())
+            if extra_fields:
+                anomalies.append(
+                    (
+                        EvidenceItem(
+                            kind="note",
+                            content=(
+                                f"Step {step.step_index}: response contains fields "
+                                f"not in request: {sorted(extra_fields)}"
+                            ),
+                        ),
+                        "unexpected_response_fields",
+                    )
+                )
+
+    return anomalies
 
 
 class DemoHoldoutVitals:

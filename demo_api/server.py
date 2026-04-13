@@ -15,10 +15,10 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
-from gauntlet import HttpRequest, InMemoryTaskAPI
+from gauntlet import HttpRequest, InMemoryHttpApi
 from gauntlet.models import HttpResponse
 
-_api = InMemoryTaskAPI()
+_api = InMemoryHttpApi()
 
 
 class _Handler(BaseHTTPRequestHandler):

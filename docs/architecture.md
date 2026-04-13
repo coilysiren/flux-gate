@@ -42,7 +42,7 @@ GauntletRunner.run()
 │   │         returns ExecutionResult
 │   │
 │   ├── Inspector.analyze(spec, execution_results)
-│   │     └── returns []Finding
+│   │     └── returns []Finding (includes anomalies: is_anomaly=True)
 │   │
 │   └── appends IterationRecord to records
 │
@@ -51,9 +51,11 @@ GauntletRunner.run()
 │
 └── _build_risk_report(records)
       ├── aggregates findings across all iterations
+      ├── separates blocker findings from anomalies (is_anomaly flag)
       ├── derives coverage from all executed steps
       ├── computes confidence_score (plan diversity + surface depth + exploration completeness)
-      ├── derives risk_level from highest finding severity
+      ├── derives risk_level from highest blocker-finding severity (anomalies excluded)
+      ├── collects anomalies into RiskReport.anomalies for future weapon refinement
       ├── evaluates clearance against gate_threshold
       └── returns RiskReport
 ```
