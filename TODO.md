@@ -18,18 +18,6 @@ Group weapons under the concept of an “Arsenal.” This aligns with the existi
 
 remove the section in TODO.md about this, then create a git commit the literal text above
 
-Lower the Python version requirement to the oldest supported version. This reduces friction for adoption, especially in CI environments. Only require newer versions if strictly necessary.
-
----
-
-remove the section in TODO.md about this, then create a git commit the literal text above
-
-Move `pytest` to development dependencies. It should not be required at runtime for a CLI tool. This keeps the installation surface minimal and clean.
-
----
-
-remove the section in TODO.md about this, then create a git commit the literal text above
-
 Improve CLI output with a one-line summary. For example: “BLOCK — resource_ownership_write_isolation violated via unauthorized PATCH.” This gives immediate clarity without reading the full report.
 
 ---
