@@ -1,0 +1,12 @@
+id: owasp_bopla
+title: "API3: Broken Object Property Level Authorization"
+description: >
+  Test whether the API enforces authorization at the property level within objects.
+  Attackers send extra or restricted properties in request bodies (mass assignment)
+  or read properties they should not see (excessive data exposure). The API should
+  allow users to read and write only the specific properties they are authorized
+  for, filtering both input and output.
+blockers:
+  - Sending extra properties (e.g. role, is_admin, owner_id) in a create or update request does not change restricted fields
+  - API responses do not expose sensitive internal properties (e.g. password hashes, internal IDs, other users' PII) beyond what the caller is authorized to see
+  - A non-privileged user cannot elevate their own permissions by writing to authorization-related fields

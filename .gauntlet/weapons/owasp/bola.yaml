@@ -1,0 +1,12 @@
+id: owasp_bola
+title: "API1: Broken Object Level Authorization"
+description: >
+  Test whether the API enforces object-level authorization. Attackers manipulate
+  object IDs in requests (path parameters, query strings, request bodies) to
+  access resources belonging to other users. The API should verify that the
+  authenticated user is authorized to access the specific object on every request,
+  not just check that the user is authenticated.
+blockers:
+  - Replacing an object ID in a GET request with another user's object ID returns 403 or 404, not the other user's data
+  - Replacing an object ID in a PATCH or DELETE request with another user's object ID is rejected, not silently applied
+  - Sequential or predictable object IDs do not allow enumeration of other users' resources
