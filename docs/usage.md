@@ -80,6 +80,28 @@ users:
 
 See the [README](../README.md#user-authentication) for supported authentication types.
 
+## Configuration file
+
+All CLI options can be specified in a YAML config file. By default, Gauntlet loads `.gauntlet/config.yaml` if it exists. Use `--config` to point to a different file.
+
+```yaml
+# .gauntlet/config.yaml
+url: http://localhost:8000
+weapon: .gauntlet/weapons
+target: .gauntlet/targets
+users: .gauntlet/users.yaml
+threshold: 0.90
+fail_fast: true
+```
+
+CLI flags always override values from the config file. For example, to use a config file but override the threshold:
+
+```bash
+gauntlet --threshold 0.50
+```
+
+If both a config file and a positional URL are provided, the positional URL takes precedence.
+
 ## Run Gauntlet
 
 ### CI pipeline
