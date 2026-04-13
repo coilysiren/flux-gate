@@ -4,11 +4,9 @@
 
 Gauntlet uses two AI agents in an adversarial loop to find bugs that traditional testing misses. One agent attacks your API with escalating, production-realistic scenarios. The other watches for failures, sharpens the next round of attacks, and decides whether the system is safe to ship.
 
-> An **Attacker** uses a **Weapon** aimed at a **Target** to generate **Plans**. A **Drone** executes those Plans as a **User**. An **Inspector** watches and surfaces **Findings**. Hidden **Vitals** — externally observable truths about expected system behavior — are checked independently to produce a **Clearance**.
+## Demo
 
-## Quick start
-
-Set your LLM credentials, then point Gauntlet at a running API:
+Try it in under a minute with the built-in demo API:
 
 ```bash
 export GAUNTLET_ATTACKER_TYPE=openai
@@ -21,18 +19,43 @@ cd gauntlet
 docker compose run --rm demo
 ```
 
-That starts the demo API and runs the full adversarial loop against it.
+## Example output
 
-## Installation
+```yaml
+risk_report:
+  confidence_score: 0.06
+  risk_level: critical
+  confirmed_failures:
+    - unauthorized_cross_user_modification   # userB rewrote userA's task
+  coverage:
+    - GET /tasks/42
+    - PATCH /tasks/42
+    - POST /tasks
+  conclusion: >-
+    System fails under adversarial pressure and should not be promoted
+    without remediation.
+```
+
+## Quick start
+
+Install Gauntlet:
 
 ```bash
 pip install gauntlet
 # or: uv add gauntlet
 ```
 
-## Usage
+Point it at your running API:
+
+```bash
+gauntlet http://localhost:8000
+```
+
+That's it. Gauntlet discovers your `.gauntlet/` config directory, loads weapons and targets, and runs the full adversarial loop.
 
 For workflow guidance (when to run, how to integrate, how to act on results), see [docs/usage.md](docs/usage.md).
+
+## Usage
 
 ### LLM configuration
 
@@ -69,23 +92,6 @@ gauntlet http://localhost:8000
 gauntlet http://localhost:8000 --no-fail-fast
 gauntlet http://localhost:8000 --weapon /path/to/weapons/ --target /path/to/targets/ --users /path/to/users.yaml
 gauntlet http://localhost:8000 --weapon /path/to/single_weapon.yaml --target /path/to/single_target.yaml
-```
-
-Output is YAML:
-
-```yaml
-risk_report:
-  confidence_score: 0.06
-  risk_level: critical
-  confirmed_failures:
-    - unauthorized_cross_user_modification   # userB rewrote userA's task
-  coverage:
-    - GET /tasks/42
-    - PATCH /tasks/42
-    - POST /tasks
-  conclusion: >-
-    System fails under adversarial pressure and should not be promoted
-    without remediation.
 ```
 
 ### Project config directory
