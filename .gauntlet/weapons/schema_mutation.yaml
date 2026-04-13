@@ -1,0 +1,12 @@
+id: schema_mutation
+title: The API rejects malformed, extra, or missing fields
+description: >
+  The API must validate incoming request bodies strictly. Sending fields
+  that are not part of the schema, omitting required fields, or supplying
+  values of the wrong type should result in a clear rejection — not silent
+  acceptance or partial application. The attack surface is any endpoint
+  that accepts a request body.
+blockers:
+  - A request with unexpected extra fields is rejected with 400 or 422, not silently accepted
+  - A request missing required fields is rejected with 400 or 422
+  - A request with wrong-type values (e.g. string where integer expected) is rejected with 400 or 422

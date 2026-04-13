@@ -1,0 +1,12 @@
+id: state_desync
+title: Actions cannot be performed on resources in invalid states
+description: >
+  The API must enforce valid state transitions and reject operations that
+  do not make sense for a resource's current state. For example, completing
+  an already-completed task, editing a deleted resource, or transitioning
+  directly from one terminal state to another. The attack surface is any
+  operation whose outcome depends on the resource's current state.
+blockers:
+  - An operation on a resource in a terminal state is rejected with 409 or 422
+  - A repeated state transition (e.g. complete an already-completed item) is rejected, not silently accepted
+  - The resource state is consistent when read back after a rejected transition attempt

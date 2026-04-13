@@ -1,0 +1,13 @@
+id: identity_swap
+title: Users cannot access or modify each other's resources
+description: >
+  The API must enforce resource ownership at every endpoint. A request
+  authenticated as user B must not be able to read, modify, or delete
+  resources that belong to user A. This covers both direct ID references
+  and any indirect paths (e.g. listing endpoints that leak other users'
+  data). The attack surface is any operation that accepts a resource
+  identifier the caller did not create.
+blockers:
+  - A write request (POST, PATCH, DELETE) by a non-owner is rejected with 403 or 404
+  - A read request (GET) by a non-owner returns 403 or 404, not the resource body
+  - The resource remains unchanged after any unauthorized modification attempt
