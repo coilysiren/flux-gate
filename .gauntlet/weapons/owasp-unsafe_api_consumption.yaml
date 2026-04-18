@@ -1,5 +1,6 @@
 id: owasp_unsafe_api_consumption
 title: "API10: Unsafe Consumption of APIs"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa10-unsafe-consumption-of-apis/
 description: >
   Test whether the API safely consumes data from third-party or upstream APIs.
   Attackers compromise or impersonate integrated services to inject malicious

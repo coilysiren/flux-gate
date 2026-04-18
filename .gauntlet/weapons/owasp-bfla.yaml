@@ -1,5 +1,6 @@
 id: owasp_bfla
 title: "API5: Broken Function Level Authorization"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/
 description: >
   Test whether the API enforces authorization at the function level. Attackers
   access administrative or privileged endpoints by guessing URLs, changing HTTP

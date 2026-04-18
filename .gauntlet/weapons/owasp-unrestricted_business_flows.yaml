@@ -1,5 +1,6 @@
 id: owasp_unrestricted_business_flows
 title: "API6: Unrestricted Access to Sensitive Business Flows"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/
 description: >
   Test whether the API restricts access to sensitive business flows that can cause
   harm when used excessively or in automated fashion. Attackers abuse legitimate

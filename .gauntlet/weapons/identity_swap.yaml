@@ -1,5 +1,6 @@
 id: identity_swap
 title: Users cannot access or modify each other's resources
+inspired_by: https://en.wikipedia.org/wiki/Privilege_escalation
 description: >
   The API must enforce resource ownership at every endpoint. A request
   authenticated as user B must not be able to read, modify, or delete

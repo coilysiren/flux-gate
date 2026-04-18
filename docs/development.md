@@ -32,7 +32,7 @@ flaw — expect `risk_level: critical`.
 ./scripts/run_arsenal.py
 ```
 
-Runs every weapon in `.gauntlet/weapons/` (including the OWASP set) against the
+Runs every weapon in `.gauntlet/weapons/` (including the `owasp-` prefixed set) against the
 in-memory demo API. No LLM keys required — uses the deterministic `Demo*`
 classes. The demo API has three seeded flaws:
 

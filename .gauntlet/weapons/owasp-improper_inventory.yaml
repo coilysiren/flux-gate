@@ -1,5 +1,6 @@
 id: owasp_improper_inventory
 title: "API9: Improper Inventory Management"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/
 description: >
   Test whether the API properly manages its inventory of exposed endpoints and
   versions. Attackers discover and exploit old API versions, undocumented endpoints,

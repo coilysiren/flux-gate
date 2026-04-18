@@ -1,5 +1,6 @@
 id: state_desync
 title: Actions cannot be performed on resources in invalid states
+inspired_by: https://en.wikipedia.org/wiki/Finite-state_machine
 description: >
   The API must enforce valid state transitions and reject operations that
   do not make sense for a resource's current state. For example, completing

@@ -1,5 +1,6 @@
 id: semantic_conflict
 title: Contradictory or logically impossible operations are rejected
+inspired_by: https://en.wikipedia.org/wiki/Business_logic
 description: >
   The API must enforce business-logic invariants beyond simple schema
   validation. Operations that are individually well-formed but semantically

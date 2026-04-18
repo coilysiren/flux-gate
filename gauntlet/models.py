@@ -209,6 +209,7 @@ class Weapon(GauntletModel):
     title: str
     description: str
     blockers: list[str]
+    inspired_by: str | None = None
 
     @field_validator("id")
     @classmethod

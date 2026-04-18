@@ -35,9 +35,9 @@ def main() -> int:
     weapons_dir = Path(".gauntlet/weapons")
     targets_dir = Path(".gauntlet/targets")
 
-    # Load all weapons (top-level + owasp/ subdirectory)
+    # Load all weapons
     weapons: list[Weapon] = []
-    for path in sorted(weapons_dir.rglob("*.yaml")):
+    for path in sorted(weapons_dir.glob("*.yaml")):
         weapons.append(Weapon(**yaml.safe_load(path.read_text())))
 
     # Load all targets

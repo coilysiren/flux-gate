@@ -104,7 +104,9 @@ If both a config file and a positional URL are provided, the positional URL take
 
 ## Arsenals
 
-An Arsenal is a named collection of weapons bundled in a single YAML file. Use `--arsenal` instead of `--weapon` to load all weapons from one file:
+Individual weapons test one property at a time. That's useful during development, but in CI you want to run an entire class of attacks in one shot — authorization checks, input validation, OWASP top-10 — without listing every weapon file on the command line. An Arsenal is a named collection of weapons bundled in a single YAML file that solves this problem. It lets you version, share, and select attack surfaces as a unit.
+
+Use `--arsenal` instead of `--weapon` to load all weapons from one file:
 
 ```yaml
 # .gauntlet/authz_arsenal.yaml
@@ -199,3 +201,43 @@ A `high` or `critical` result means the agent has drifted from the intended beha
 ### Accumulate failure knowledge
 
 Save the `confirmed_failures` from each run. Over time this becomes a knowledge base of failure patterns. Reference it when writing new weapons and reviewing code — recurring failures indicate systemic gaps in weapon coverage.
+
+## Example AGENTS.md
+
+If your coding agent reads an `AGENTS.md` (or `CLAUDE.md`, `GEMINI.md`, etc.) to learn project conventions, add a section that tells it to run Gauntlet as a final step. Here is a complete example you can adapt:
+
+```markdown
+# AGENTS.md
+
+## Workflow
+
+After any code change:
+
+1. Run tests — `pytest` (or your test command). All tests must pass.
+2. Run linting and formatting checks.
+3. Deploy to the local/staging environment.
+4. Run Gauntlet as the final check before marking work complete:
+
+   ```bash
+   gauntlet http://localhost:8000
+   ```
+
+## Interpreting Gauntlet results
+
+- `risk_level: low` — safe to commit and promote.
+- `risk_level: medium` — attempt fixes and re-run.
+- `risk_level: high` or `critical` — **stop**. Do not attempt automated fixes. Surface the result to a human.
+
+## Writing weapons
+
+When adding a new API endpoint or modifying authorization logic, check whether
+an existing weapon in `.gauntlet/weapons/` covers the change. If not, create a
+new weapon YAML file. See the [Gauntlet usage docs](docs/usage.md#write-weapons)
+for the format.
+
+## Accumulating failure knowledge
+
+After each Gauntlet run, save the `confirmed_failures` list. Reference it when
+writing new code — recurring failures indicate blind spots that need dedicated
+weapons or architectural fixes.
+```

@@ -122,8 +122,11 @@ Adapters implement both ``send`` (HTTP shorthand) and ``execute``
 can use different providers (e.g., GPT-4 vs Claude) so users can mix strengths
 or reduce cost.
 
-**Why Arsenals?** An Arsenal is a named collection of Weapons. It replaces the
-earlier "policy packs" concept with vocabulary that fits the existing metaphor.
-Users load an arsenal via ``--arsenal path/to/arsenal.yaml`` to run the full set
-of weapons it contains. The CLI falls back to ``--weapon`` for individual
-weapon files when no arsenal is specified.
+**Why Arsenals?** Individual weapons test one property at a time, which is the
+right granularity for authoring and debugging. But CI pipelines and agentic
+loops need to select an entire class of attacks — authorization, input
+validation, OWASP top-10 — as a single unit. An Arsenal is a named collection
+of Weapons that can be versioned, shared, and loaded with one flag
+(``--arsenal``). Without arsenals, users would need to list every weapon file
+on the command line or maintain a wrapper script.  The CLI falls back to
+``--weapon`` for individual weapon files when no arsenal is specified.

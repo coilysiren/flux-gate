@@ -1,5 +1,6 @@
 id: temporal_replay
 title: Completed or expired actions cannot be replayed or reordered
+inspired_by: https://en.wikipedia.org/wiki/Replay_attack
 description: >
   The API must be resilient to replay and timing attacks. Replaying an
   identical request that already succeeded (e.g. re-submitting a creation

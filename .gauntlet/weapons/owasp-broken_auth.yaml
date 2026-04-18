@@ -1,5 +1,6 @@
 id: owasp_broken_auth
 title: "API2: Broken Authentication"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/
 description: >
   Test whether authentication mechanisms are correctly implemented. Attackers
   target token generation, password management, and session handling to

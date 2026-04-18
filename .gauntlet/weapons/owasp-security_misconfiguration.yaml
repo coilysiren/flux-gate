@@ -1,5 +1,6 @@
 id: owasp_security_misconfiguration
 title: "API8: Security Misconfiguration"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/
 description: >
   Test whether the API is securely configured. Attackers exploit missing security
   headers, overly permissive CORS policies, verbose error messages, default

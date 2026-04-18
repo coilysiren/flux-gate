@@ -1,5 +1,6 @@
 id: owasp_bola
 title: "API1: Broken Object Level Authorization"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/
 description: >
   Test whether the API enforces object-level authorization. Attackers manipulate
   object IDs in requests (path parameters, query strings, request bodies) to

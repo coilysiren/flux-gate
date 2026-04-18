@@ -1,5 +1,6 @@
 id: schema_mutation
 title: The API rejects malformed, extra, or missing fields
+inspired_by: https://en.wikipedia.org/wiki/Fuzzing
 description: >
   The API must validate incoming request bodies strictly. Sending fields
   that are not part of the schema, omitting required fields, or supplying

@@ -1,5 +1,6 @@
 id: owasp_bopla
 title: "API3: Broken Object Property Level Authorization"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/
 description: >
   Test whether the API enforces authorization at the property level within objects.
   Attackers send extra or restricted properties in request bodies (mass assignment)
