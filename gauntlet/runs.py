@@ -25,6 +25,7 @@ or the buffer is being misused as a holdout sink.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from datetime import datetime, timezone
@@ -35,6 +36,8 @@ from .models import HoldoutResult, IterationRecord
 DEFAULT_RUNS_PATH = ".gauntlet/runs"
 
 _RUN_ID_RE = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+_LOG = logging.getLogger(__name__)
 
 
 class RunStore:
@@ -78,6 +81,12 @@ class RunStore:
 
         Raises ``ValueError`` if any finding has ``violated_blocker`` set —
         the train/test split forbids blocker text from entering this buffer.
+
+        Emits a warning log for any finding that arrives without a populated
+        ``replay_bundle``. Reproducibility is a load-bearing promise of a
+        Gauntlet finding; a missing bundle means the Inspector skipped the
+        capture step. Warnings rather than rejections for now so the
+        discipline can bed in without breaking in-flight hosts.
         """
         for finding in record.findings:
             if finding.violated_blocker is not None:
@@ -85,6 +94,16 @@ class RunStore:
                     "IterationRecord findings must not carry 'violated_blocker' — "
                     "the Inspector context never sees blocker text. Set it to None "
                     "or route the finding through the holdout buffer instead."
+                )
+            if finding.replay_bundle is None:
+                _LOG.warning(
+                    "Finding recorded without replay_bundle "
+                    "(run_id=%s weapon_id=%s issue=%s). The Inspector should "
+                    "populate replay_bundle by copying ReplayStep data from "
+                    "the ExecutionStepResult(s) that produced this finding.",
+                    run_id,
+                    weapon_id,
+                    finding.issue,
                 )
         self._append(run_id, weapon_id, "iterations.jsonl", record.model_dump_json())
 

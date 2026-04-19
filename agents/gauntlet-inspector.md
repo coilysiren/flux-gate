@@ -41,6 +41,7 @@ You have read access to local files via the `Read` tool only if the Orchestrator
      "reproduction_steps": ["Step 1: POST /tasks as userA ...", "Step 2: PATCH /tasks/{id} as userB — expect 403, got 200"],
      "traces": [...],                          # copy from ExecutionResult.steps
      "violated_blocker": null,                 # ALWAYS null — you have not seen the blockers
+     "replay_bundle": {"steps": [...]},        # MANDATORY — see "Replay bundles" below
      "next_targets": ["ownership mutation", "list visibility", ...],
      "is_anomaly": false                        # set true for suspicious-but-not-violating observations
    }
@@ -73,6 +74,37 @@ You have read access to local files via the `Read` tool only if the Orchestrator
    The buffer accepts multiple records per iteration; the assembler merges them. Empty plans/execution_results lists are fine.
 
 6. Return a one-paragraph summary to the Orchestrator: count of findings by severity, any `high`-severity issues that warrant fail-fast.
+
+## Replay bundles (mandatory on every finding)
+
+Every `Finding` you emit MUST populate `replay_bundle`. The replay bundle is a
+minimal sequence of `ReplayStep`s sufficient to reproduce the finding against a
+fresh SUT. It is the difference between a Gauntlet finding (reproducible
+deterministic steps) and a manual bug report (free-form English).
+
+The easy, correct way to populate it: **copy the `ReplayStep`s directly from
+the `ExecutionStepResult`s that produced the finding.** Each
+`ExecutionStepResult` carries a `user` and a `request`; a `ReplayStep` carries
+the same two fields. Build the bundle from the minimal subset of steps needed
+to reproduce — usually every step in the offending plan, but you may drop
+irrelevant setup steps.
+
+```python
+"replay_bundle": {
+  "steps": [
+    {"user": s.user, "request": s.request}
+    for s in execution_step_results_for_this_finding
+  ],
+}
+```
+
+If a finding is cross-plan (the issue only surfaces when plans A and B run in
+sequence), include steps from both plans in order. `replay_finding` will
+replay them end-to-end.
+
+Never leave `replay_bundle` as `null`. The buffer currently warns rather than
+rejects, but that policy can tighten, and the Orchestrator may skip findings
+without a replay bundle when evaluating fixes.
 
 ## What good Inspector work looks like
 

@@ -29,6 +29,7 @@ from .models import (
     HoldoutResult,
     IterationRecord,
     Plan,
+    PlanStep,
     RiskReport,
     Weapon,
     WeaponReport,
@@ -189,6 +190,54 @@ def read_holdout_results(run_id: str, weapon_id: str) -> list[HoldoutResult]:
 
 
 @mcp.tool()
+def replay_finding(
+    run_id: str,
+    weapon_id: str,
+    finding_index: int,
+    url: str,
+    user_headers: dict[str, dict[str, str]] | None = None,
+) -> ExecutionResult:
+    """Re-execute the ``ReplayBundle`` of a stored finding against the SUT.
+
+    Walks the weapon's iteration records in append order, flattens their
+    findings, and picks the ``finding_index``-th entry (0-indexed). The
+    finding must carry a populated ``replay_bundle`` — ``ReplayBundle.steps``
+    are converted 1:1 into a ``Plan`` with ``category="replay"`` and no
+    assertions, then executed through the normal Drone path.
+
+    Useful for "did the fix actually work" loops: the host picks a stored
+    finding, calls ``replay_finding`` against a patched SUT, and checks
+    whether the reproduced ``ExecutionResult`` still shows the failure.
+
+    Raises ``ValueError`` if the index is out of range or the targeted
+    finding has no ``replay_bundle``.
+    """
+    records = _run_store.read_iteration_records(run_id, weapon_id)
+    findings = [finding for record in records for finding in record.findings]
+    if finding_index < 0 or finding_index >= len(findings):
+        raise ValueError(
+            f"finding_index {finding_index} out of range; "
+            f"only {len(findings)} findings recorded for weapon {weapon_id!r}"
+        )
+    finding = findings[finding_index]
+    if finding.replay_bundle is None:
+        raise ValueError(
+            f"Finding {finding.issue!r} has no replay_bundle; cannot replay. "
+            "The Inspector should populate replay_bundle on every finding "
+            "by copying ReplayStep data from the offending ExecutionStepResult(s)."
+        )
+    plan = Plan(
+        name=f"replay:{finding.issue}",
+        category="replay",
+        goal="reproduce finding",
+        steps=[PlanStep(user=s.user, request=s.request) for s in finding.replay_bundle.steps],
+        assertions=[],
+    )
+    drone = Drone(HttpApi(url, user_headers=user_headers or {}))
+    return drone.run_plan(plan)
+
+
+@mcp.tool()
 def assemble_final_clearance(
     run_id: str,
     clearance_threshold: float = 0.90,
@@ -241,6 +290,7 @@ __all__ = [
     "read_iteration_records",
     "record_holdout_result",
     "record_iteration",
+    "replay_finding",
     "start_run",
 ]
 
