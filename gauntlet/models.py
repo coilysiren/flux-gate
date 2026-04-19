@@ -58,6 +58,28 @@ class ExecutionStepResult(GauntletModel):
     user: str
     request: HttpRequest
     response: HttpResponse
+    duration_ms: float = 0.0
+    """Wall-clock time from request send to response received, in milliseconds.
+
+    Populated by the Drone via ``time.perf_counter()``. Defaults to ``0.0`` so
+    hand-built fixtures and earlier JSONL buffers don't need rewriting.
+    """
+    response_size_bytes: int = 0
+    """Raw byte length of the response body as received over the wire."""
+    response_headers: dict[str, str] = Field(default_factory=dict)
+    """Filtered subset of response headers — see ``gauntlet.http`` for the allowlist.
+
+    The filter keeps the surface to a stable, privacy-aware set the Inspector
+    can reason about without drowning in noise.
+    """
+    outcome: Literal["ok", "timeout", "connection_reset", "dns_failure", "other_error"] = "ok"
+    """Transport-level disposition.
+
+    Distinguishes clean HTTP responses (``ok``) from network failures that
+    would otherwise surface as exceptions. On non-``ok`` outcomes the Drone
+    still records a synthetic ``HttpResponse`` (``status_code=0``, empty body)
+    so downstream consumers see a uniform shape.
+    """
 
 
 class AssertionResult(GauntletModel):

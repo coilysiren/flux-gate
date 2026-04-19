@@ -9,7 +9,7 @@ from gauntlet import (
     Plan,
     PlanStep,
 )
-from gauntlet.http import HttpApi
+from gauntlet.http import HttpApi, SendResult
 
 
 class _StubApi:
@@ -20,10 +20,10 @@ class _StubApi:
     """
 
     def __init__(self, responses: list[HttpResponse]) -> None:
-        self._queue = list(responses)
+        self._queue = [SendResult(response=r) for r in responses]
         self.calls: list[tuple[str, HttpRequest]] = []
 
-    def send(self, user: str, request: HttpRequest) -> HttpResponse:
+    def send(self, user: str, request: HttpRequest) -> SendResult:
         self.calls.append((user, request))
         return self._queue.pop(0)
 
@@ -181,6 +181,56 @@ def test_explicit_extract_supersedes_legacy_shortcut() -> None:
     drone.run_plan(plan)
 
     assert stub.calls[1][1].path == "/tasks/alpha"
+
+
+# ---------------------------------------------------------------------------
+# Task 2: metadata propagation from SendResult into ExecutionStepResult
+# ---------------------------------------------------------------------------
+
+
+def test_send_result_metadata_flows_into_step_result() -> None:
+    """Drone copies duration, size, headers, and outcome onto each step."""
+    stub = _StubApi([])
+    stub._queue.append(
+        SendResult(
+            response=HttpResponse(status_code=200, body={"ok": True}),
+            duration_ms=12.5,
+            response_size_bytes=17,
+            response_headers={"Server": "nginx", "X-Request-Id": "abc"},
+            outcome="ok",
+        )
+    )
+    drone = Drone(stub)  # type: ignore[arg-type]
+    plan = Plan(
+        name="metadata",
+        category="crud",
+        goal="verify metadata flow",
+        steps=[PlanStep(user="userA", request=HttpRequest(method="GET", path="/ping"))],
+    )
+
+    result = drone.run_plan(plan)
+
+    step = result.steps[0]
+    assert step.duration_ms == 12.5
+    assert step.response_size_bytes == 17
+    assert step.response_headers == {"Server": "nginx", "X-Request-Id": "abc"}
+    assert step.outcome == "ok"
+
+
+def test_execution_step_result_defaults_preserve_existing_fixtures() -> None:
+    """New fields default so hand-built ExecutionStepResults don't need rewriting."""
+    from gauntlet import ExecutionStepResult
+
+    step = ExecutionStepResult(
+        step_index=1,
+        user="userA",
+        request=HttpRequest(method="GET", path="/x"),
+        response=HttpResponse(status_code=200, body={}),
+    )
+    assert step.duration_ms == 0.0
+    assert step.response_size_bytes == 0
+    assert step.response_headers == {}
+    assert step.outcome == "ok"
 
 
 # ---------------------------------------------------------------------------

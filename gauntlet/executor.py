@@ -24,16 +24,20 @@ class Drone:
         context: dict[str, object] = {}
         for index, step in enumerate(plan.steps, start=1):
             request = step.request.model_copy(update={"path": step.request.path.format(**context)})
-            response = self._sut.send(step.user, request)
+            send_result = self._sut.send(step.user, request)
             step_results.append(
                 ExecutionStepResult(
                     step_index=index,
                     user=step.user,
                     request=request,
-                    response=response,
+                    response=send_result.response,
+                    duration_ms=send_result.duration_ms,
+                    response_size_bytes=send_result.response_size_bytes,
+                    response_headers=send_result.response_headers,
+                    outcome=send_result.outcome,
                 )
             )
-            _apply_extractions(step, response.body, context)
+            _apply_extractions(step, send_result.response.body, context)
 
         assertion_results = [
             _evaluate_assertion(assertion, step_results) for assertion in plan.assertions
