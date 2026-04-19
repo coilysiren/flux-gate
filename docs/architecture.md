@@ -24,7 +24,6 @@ gauntlet/
 ├── loop.py      # build_default_iteration_specs + build_risk_report helpers
 ├── runs.py      # RunStore - per-run iteration + holdout buffer (filesystem)
 ├── store.py     # PlanStore and FindingsStore - disk-backed knowledge indexed by weapon ID
-├── schemas/     # JSON Schema files for weapon / target / users / arsenal
 └── server.py    # FastMCP server exposing the gauntlet tools
 ```
 

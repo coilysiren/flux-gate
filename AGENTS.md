@@ -39,18 +39,6 @@ Commit whenever a unit of work feels sufficiently complete — after fixing a bu
 
 Sync `docs/architecture.md` with the current module structure in `gauntlet/`. Check for new files, removed files, new classes/protocols, and changed abstractions.
 
-## JSON Schemas
-
-`gauntlet/schemas/*.schema.json` are generated from the Pydantic models and committed to the repo so external tooling can validate user-authored YAML (Weapon, Target, Arsenal, UsersConfig) without importing the package.
-
-After modifying `gauntlet/models.py` or `gauntlet/auth.py` — or adding a new user-authored YAML artifact — regenerate and commit the schemas:
-
-```bash
-uv run python scripts/export_schemas.py
-```
-
-When adding a new user-authored artifact, also register its Pydantic model in `SCHEMA_MODELS` in [`gauntlet/schemas/__init__.py`](gauntlet/schemas/__init__.py). The drift test in `tests/test_schemas.py` fails CI if the committed files and the models diverge.
-
 ## Approved commands
 
 Any command listed in [docs/development.md](docs/development.md) may be run without requesting user approval.

@@ -60,7 +60,7 @@ If you find five candidate invariants, prefer five over fifty. Each weapon adds 
 
 Authoring location: `.gauntlet/weapons/<slug>.yaml`. One file per weapon. Slug is snake_case derived from the invariant.
 
-Required fields, per the [Weapon schema](../../gauntlet/schemas/weapon.schema.json):
+Required fields, per the `Weapon` Pydantic model in [`gauntlet/models.py`](../../gauntlet/models.py):
 
 ```yaml
 id: resource_ownership_write_isolation     # snake_case, stable across runs
