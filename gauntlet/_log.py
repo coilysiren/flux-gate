@@ -20,8 +20,8 @@ Deliberately NOT in this module:
 - A per-call timings JSONL alongside the buffers
 - OpenTelemetry / tracing
 
-See [TODO.md](../TODO.md) "In-flight structured logging" for the scope
-rationale.
+Hosts that want any of the above wrap stderr themselves; Gauntlet doesn't
+pick a vendor.
 """
 
 from __future__ import annotations

@@ -29,7 +29,6 @@ Gauntlet runs **exclusively as an MCP server inside Claude Code**. There is no C
 - [Architecture](docs/architecture.md) — module map, MCP tool surface, train/test split, design decisions
 - [Development](docs/development.md) — setup, tests, linting, Docker, CI
 - [Usage](docs/usage.md) — host runbook: the driven loop, interpreting results
-- [TODO](TODO.md) — known gaps with bounded scope
 
 ## Git workflow
 
