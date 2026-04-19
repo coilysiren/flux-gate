@@ -5,8 +5,6 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![mypy: strict](https://img.shields.io/badge/mypy-strict-1f5082?logo=python&logoColor=white)](http://mypy-lang.org/)
-[![tests: 151 passing](https://img.shields.io/badge/tests-151%20passing-brightgreen?logo=pytest&logoColor=white)](#development)
-[![coverage: 99%](https://img.shields.io/badge/coverage-99%25-brightgreen)](#development)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://pre-commit.com/)
 [![tested: hypothesis](https://img.shields.io/badge/tested%20with-hypothesis-d4aa00?logo=python&logoColor=white)](https://hypothesis.readthedocs.io/)
 [![MCP server](https://img.shields.io/badge/MCP-server-8A63D2)](https://modelcontextprotocol.io/)
