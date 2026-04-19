@@ -33,22 +33,6 @@ Concretely, extend `HttpApi.send` and `ExecutionStepResult` to capture:
 
 The Inspector then has signal for: side-channel timing leaks, info-disclosure via headers, suspicious response-size patterns, infrastructure flakiness. Internal change — `ExecutionStepResult` gains optional fields, no MCP tool changes. ~150 lines.
 
-## Wire up `ReplayBundle` so attack patterns are deterministically reproducible
-
-`Finding` carries an optional `replay_bundle: ReplayBundle | None` field, but nothing populates it today. The model exists; the wiring doesn't. Attack patterns are supposed to be reproducible deterministic steps — that's the difference between Gauntlet's findings and a manual bug report. Without a populated `ReplayBundle`, the only reproduction path is for a human to read `evidence` + `reproduction_steps` (free-form English) and re-derive the request sequence by hand.
-
-Concretely:
-
-- The Inspector subagent should populate `replay_bundle` on every `Finding` it emits, copying the `ReplayStep`s from the `ExecutionResult.steps` that produced the finding.
-- Update [`agents/gauntlet-inspector.md`](agents/gauntlet-inspector.md) to mandate it (currently silent on the field).
-- Schema-level enforcement at the buffer boundary, similar to the `violated_blocker is None` check, would be ideal — `record_iteration` could reject findings without a `replay_bundle`. Risk: this adds a hard requirement that may surprise consumers; consider a softer first pass (warning, not rejection) until the discipline is bedded in.
-- Add a `replay_finding(finding_id_or_run_id_pair, url, user_headers)` MCP tool that takes a stored finding and re-executes its `ReplayBundle` against the SUT. Useful for "did the fix actually work" loops. **This adds a public MCP tool — coordinate with SCOPE.md before shipping.**
-
-Open questions:
-
-- Path-template handling: `ReplayBundle.steps` carry raw `HttpRequest`s. Dynamic IDs (`{task_id}` resolved from a prior POST response) need either to be re-resolved at replay time or baked in at capture time. The current Drone resolves them at run time; the replay bundle should probably do the same. (Depends on the path-template generalization above.)
-- What identifies a finding for replay? `(weapon_id, issue, run_id)`? A separate finding id?
-
 ## Risk-report intelligence in `loop.py`
 
 `_confidence_score` is honestly ~30 lines of weighted math, and the rest of `build_risk_report` is sorting. This is supposed to be where the deterministic "intelligence" of Gauntlet lives — and it's nearly empty.
@@ -127,22 +111,3 @@ Heuristic — false positives expected, false negatives certain. Returned as war
 
 Marginal value, but cheap. Below the others because the LLM is usually capable of writing reasonable holdout plans, and the heuristics could become noise.
 
-## Across-iteration plan mutation
-
-Today the Attacker subagent re-derives plans from scratch each iteration by re-prompting against the iteration buffer. A deterministic Python mutator could take a plan that landed in iteration N and produce variants for iteration N+1 (drop a field, swap users, change expected status). Wins: determinism, no LLM tokens for the mutation step. Losses: re-introduces a Python "intelligence" layer that competes with the Attacker subagent, for a marginal token saving since each iteration only generates 2-4 plans.
-
-**Defer until at least one production loop has battle-tested the in-prompt approach.** If the Attacker subagent's regenerate-from-scratch loop turns out to under-explore (the same baseline plan keeps getting repeated, edge cases never surface), revisit. Until then, don't.
-
-If revisited:
-
-- Mutator reads only what the Attacker has already seen (`read_iteration_records`); no train/test split risk.
-- Lives behind a new MCP tool the Attacker can call, not as a hidden replacement for in-prompt generation. **New MCP tool — coordinate with SCOPE.md.**
-- Stays within a single run.
-
-## Cross-run failure correlation
-
-Each Gauntlet run is fully ephemeral today — `.gauntlet/runs/<run_id>/` is wiped between runs in practice, and there's no cross-run aggregator. If a project re-runs Gauntlet across days/weeks of iterations, knowing "this same `confirmed_failure` showed up in 3 of the last 5 runs" is genuinely useful signal.
-
-Out of scope until a real consumer asks for it. Shape would be a re-introduced `FindingsStore` keyed by `weapon_id`, plus an MCP tool like `recurring_failures(weapon_id, lookback=5)`. Both were deleted; both could come back if the use case materializes.
-
-**New MCP tool + reverses an explicit cut. Coordinate with SCOPE.md.**

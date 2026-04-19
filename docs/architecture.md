@@ -10,14 +10,22 @@ Gauntlet does not call any LLM itself and requires no Anthropic/OpenAI credentia
 
 ```
 gauntlet/
-├── models.py    # Pydantic data models - the shared vocabulary with the host
-│                #   (HoldoutResult wraps an ExecutionResult with the blocker
-│                #   it tested)
-├── http.py      # HttpApi — real HTTP requests via `requests`
-├── executor.py  # Drone - runs plans by calling HttpApi.send per step
-├── loop.py      # build_risk_report + aggregate_final_clearance helpers
-├── runs.py      # RunStore - per-run iteration + holdout buffer (filesystem)
-└── server.py    # FastMCP server exposing the gauntlet tools
+├── models.py            # Pydantic data models - the shared vocabulary with
+│                        #   the host (HoldoutResult wraps an ExecutionResult
+│                        #   with the blocker it tested)
+├── http.py              # HttpApi — real HTTP requests via `requests`
+├── executor.py          # Drone - runs plans by calling HttpApi.send per step
+├── loop.py              # build_risk_report + aggregate_final_clearance helpers
+├── runs.py              # RunStore - per-run iteration + holdout buffer
+│                        #   (filesystem); warns on findings without
+│                        #   replay_bundle
+├── _mutator.py          # Deterministic plan mutator (drop field, rotate
+│                        #   users, negate expected, reverse order); internal,
+│                        #   exposed via the mutate_plans MCP tool
+├── _findings_store.py   # Cross-run FindingsStore (JSONL per weapon); internal,
+│                        #   exposed via assemble_run_report (writer) and
+│                        #   recurring_failures (reader)
+└── server.py            # FastMCP server exposing the gauntlet tools
 ```
 
 Dependency order:
@@ -25,9 +33,11 @@ Dependency order:
 ```
 models  ←  http
 models  ←  runs
+models  ←  _mutator
+models  ←  _findings_store
 models + http  ←  executor
 models  ←  loop
-models + executor + loop + http + runs  ←  server
+models + executor + loop + http + runs + _mutator + _findings_store  ←  server
 ```
 
 Nothing imports from `server.py`. The MCP entry point (`main()` in `server.py`) runs `FastMCP.run()` which speaks stdio to the Claude Code process that launched it.
@@ -55,12 +65,15 @@ The skills are pure prose (no executable code); they encode role discipline that
 | `get_weapon(weapon_id, weapons_path)` | `Weapon` (with blockers) | reads YAML from disk |
 | `execute_plan(url, plan, user_headers)` | `ExecutionResult` | sends real HTTP requests to the SUT |
 | `start_run(weapon_ids)` | `{run_id}` | creates `.gauntlet/runs/<run_id>/` |
-| `record_iteration(run_id, weapon_id, iteration_record)` | `{status: ok}` | appends one `IterationRecord` to the buffer |
+| `record_iteration(run_id, weapon_id, iteration_record)` | `{status: ok}` | appends one `IterationRecord` to the buffer; warns on findings without `replay_bundle` |
 | `read_iteration_records(run_id, weapon_id)` | `list[IterationRecord]` | reads from the buffer |
 | `record_holdout_result(run_id, weapon_id, holdout_result)` | `{status: ok}` | appends one `HoldoutResult` to the buffer |
 | `read_holdout_results(run_id, weapon_id)` | `list[HoldoutResult]` | reads from the buffer |
-| `assemble_run_report(run_id, weapon_id, threshold)` | `dict` with `risk_report` + `clearance` | reads from the buffer |
+| `assemble_run_report(run_id, weapon_id, threshold)` | `dict` with `risk_report` + `clearance` | reads from the buffer; writes confirmed-failure findings to `.gauntlet/findings/<weapon_id>.jsonl` |
 | `assemble_final_clearance(run_id, clearance_threshold, weapon_ids?)` | `FinalClearance` | reads every per-weapon report from the buffer and aggregates |
+| `replay_finding(run_id, weapon_id, finding_index, url, user_headers)` | `ExecutionResult` | walks the iteration buffer, converts a stored finding's `ReplayBundle` to a `Plan`, and executes it against the SUT |
+| `mutate_plans(run_id, weapon_id, max_variants)` | `list[Plan]` | reads the iteration buffer; deterministic — no network, no state change |
+| `recurring_failures(weapon_id, lookback, findings_path)` | `list[dict]` of `{issue, occurrences, run_ids}` | reads `.gauntlet/findings/<weapon_id>.jsonl` |
 
 ### Run-scoped buffer
 
@@ -78,15 +91,29 @@ state surviving across runs. If a run crashes, restart from `start_run`.
 `record_iteration` rejects any `IterationRecord` whose findings carry a
 non-null `violated_blocker`. The Inspector context never sees blocker text,
 so a populated `violated_blocker` would mean a train/test split violation;
-the schema enforces this at the buffer boundary.
+the schema enforces this at the buffer boundary. `record_iteration` also
+warns on any finding that lands without a `replay_bundle` — reproducibility
+is the promise that distinguishes a Gauntlet finding from a manual bug
+report, and the Inspector is expected to populate it from the offending
+`ExecutionStepResult`s. Warning, not rejection; tightens later.
+
+### Cross-run findings store
+
+`.gauntlet/findings/<weapon_id>.jsonl` accumulates confirmed-failure
+`Finding`s across runs for one consumer: `recurring_failures`, which
+surfaces issues that showed up in ≥ 2 of the last N runs. Writes happen
+as a side effect of `assemble_run_report`, wrapped in a try/except so a
+store-write failure never aborts the report call. Everything else about
+Gauntlet remains run-scoped; the cross-run store exists only to answer
+the one question `recurring_failures` asks.
 
 ## Train/test split
 
 The split is enforced at two layers:
 
 1. **MCP-tool allowlists on per-role subagents.** The plugin ships three subagent definitions in `agents/`:
-   - `gauntlet-attacker` — allowlist excludes `get_weapon`, `read_holdout_results`, `record_holdout_result`. Can read its own prior plans + Inspector findings via `read_iteration_records`.
-   - `gauntlet-inspector` — allowlist excludes `get_weapon`, `read_holdout_results`, `record_holdout_result`, and even the SUT-execution tools. Reads execution results via the iteration buffer; emits findings via `record_iteration`.
+   - `gauntlet-attacker` — allowlist excludes `get_weapon`, `read_holdout_results`, `record_holdout_result`. Can read its own prior plans + Inspector findings via `read_iteration_records`, and derive deterministic variants via `mutate_plans`.
+   - `gauntlet-inspector` — allowlist excludes `get_weapon`, `read_holdout_results`, `record_holdout_result`, and even the SUT-execution tools. Reads execution results via the iteration buffer; emits findings via `record_iteration`, each populating `replay_bundle` so `replay_finding` can reproduce them.
    - `gauntlet-holdout-evaluator` — allowlist includes `get_weapon` and `record_holdout_result`. Excludes `read_iteration_records` so prior Attacker/Inspector traces cannot leak in. Runs from fresh context per weapon.
 
    These allowlists are enforced by Claude Code's permission layer before the MCP server sees a call; a subagent that tries to use a forbidden tool fails at the permission check. This is structural enforcement of the split, not prompt discipline.

@@ -53,8 +53,11 @@ Without the skill, a host could still call the MCP tools ad-hoc, but it would ha
 | `read_iteration_records(run_id, weapon_id)` | Read prior `IterationRecord`s for one weapon in this run | Attacker, Inspector |
 | `record_holdout_result(run_id, weapon_id, holdout_result)` | Append a `HoldoutResult` to the run buffer | HoldoutEvaluator |
 | `read_holdout_results(run_id, weapon_id)` | Read prior `HoldoutResult`s for one weapon in this run | Orchestrator |
-| `assemble_run_report(run_id, weapon_id)` | Build per-weapon `RiskReport` + `Clearance` | Orchestrator |
+| `assemble_run_report(run_id, weapon_id)` | Build per-weapon `RiskReport` + `Clearance`; also persists confirmed-failure findings to the cross-run store as a side effect | Orchestrator |
 | `assemble_final_clearance(run_id, clearance_threshold)` | Aggregate every per-weapon report in the run into one overall `FinalClearance` (pass / conditional / block) | Orchestrator, HoldoutEvaluator |
+| `replay_finding(run_id, weapon_id, finding_index, url, user_headers)` | Re-execute a stored finding's `ReplayBundle` against the SUT; useful for "did the fix actually work" loops | Orchestrator |
+| `mutate_plans(run_id, weapon_id, max_variants)` | Deterministic variants of recorded plans (drop field / rotate users / negate expected / reverse steps) | Orchestrator, Attacker |
+| `recurring_failures(weapon_id, lookback, findings_path)` | Findings that showed up in ≥ 2 of the last N runs for a weapon | Orchestrator |
 
 The train/test split is enforced at the permission layer via MCP-tool allowlists on each per-role subagent — see the [`agents/`](agents/) directory. The Attacker subagent literally cannot call `get_weapon`, the Inspector subagent cannot call `get_weapon` or read holdout results, and the HoldoutEvaluator subagent cannot read the iteration buffer.
 
