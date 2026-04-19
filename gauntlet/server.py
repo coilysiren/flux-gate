@@ -13,12 +13,14 @@ the subagents' MCP-tool allowlists, plus at the buffer boundary by
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 import yaml
 from mcp.server.fastmcp import FastMCP
 
+from ._findings_store import DEFAULT_FINDINGS_PATH, FindingsStore
 from ._mutator import mutate_plans as _mutate_plans
 from .executor import Drone
 from .http import HttpApi
@@ -40,6 +42,8 @@ from .runs import RunStore
 mcp = FastMCP("gauntlet")
 
 _DEFAULT_WEAPONS_PATH = ".gauntlet/weapons"
+
+_LOG = logging.getLogger(__name__)
 
 # Relative path resolved against cwd at filesystem-access time, so a host that
 # chdir's into the project root gets the right buffer location.
@@ -111,11 +115,36 @@ def assemble_run_report(
     Reads the iteration and holdout buffers the server owns and assembles
     the report. Returns ``risk_report`` plus a clearance recommendation
     (``pass``, ``conditional``, or ``block``).
+
+    Side effect: confirmed-failure ``Finding``s from the iteration buffer
+    are persisted to the cross-run ``FindingsStore`` so
+    ``recurring_failures`` can surface repeated issues. Store writes are
+    wrapped in a try/except and logged; a failure to write never aborts
+    the report call.
     """
     records = _run_store.read_iteration_records(run_id, weapon_id)
     holdouts = [hr.execution_result for hr in _run_store.read_holdout_results(run_id, weapon_id)]
 
     report, clearance = build_risk_report(records, holdouts, clearance_threshold)
+
+    try:
+        store = FindingsStore(DEFAULT_FINDINGS_PATH)
+        confirmed_issues = set(report.confirmed_failures)
+        for record in records:
+            for finding in record.findings:
+                if finding.is_anomaly:
+                    continue
+                if finding.issue not in confirmed_issues:
+                    continue
+                store.record(weapon_id, run_id, finding)
+    except Exception as exc:  # pragma: no cover - defensive
+        _LOG.warning(
+            "Failed to persist findings to cross-run store (run_id=%s weapon_id=%s): %s",
+            run_id,
+            weapon_id,
+            exc,
+        )
+
     return {
         "risk_report": report.model_dump(),
         "clearance": clearance.model_dump() if clearance else None,
@@ -188,6 +217,27 @@ def read_holdout_results(run_id: str, weapon_id: str) -> list[HoldoutResult]:
     semantics and reading them collapses the train/test split.
     """
     return _run_store.read_holdout_results(run_id, weapon_id)
+
+
+@mcp.tool()
+def recurring_failures(
+    weapon_id: str,
+    lookback: int = 5,
+    findings_path: str = DEFAULT_FINDINGS_PATH,
+) -> list[dict[str, Any]]:
+    """Return issues seen in ≥ 2 of the last ``lookback`` runs for a weapon.
+
+    Reads ``<findings_path>/<weapon_id>.jsonl`` (populated as a side effect
+    of ``assemble_run_report``) and groups findings by ``issue`` across the
+    most recent ``lookback`` distinct run ids. Returns one entry per
+    recurring issue: ``{issue, occurrences, run_ids}``, sorted by
+    occurrence count descending then issue ascending.
+
+    Intended for the Orchestrator (host skill) to surface "this same
+    confirmed_failure showed up in 3 of the last 5 runs" signal. Not
+    allowlisted for any per-role subagent.
+    """
+    return FindingsStore(findings_path).recurring(weapon_id, lookback=lookback)
 
 
 @mcp.tool()
@@ -321,6 +371,7 @@ __all__ = [
     "read_iteration_records",
     "record_holdout_result",
     "record_iteration",
+    "recurring_failures",
     "replay_finding",
     "start_run",
 ]
