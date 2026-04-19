@@ -40,7 +40,7 @@ LUCA's iteration ladder is fixed at 4 stages: `baseline` → `boundary` → `adv
 
 For each `IterationSpec`, dispatch the Attacker subagent, then the Inspector subagent.
 
-**Dispatch the Attacker** — pass `run_id`, `weapon_id`, the iteration spec, the SUT `url`, and `users_path`. The subagent will:
+**Dispatch the Attacker** — pass `run_id`, `weapon_id`, the iteration spec, the SUT `url`, and `user_headers`. The subagent will:
 
 - read its weapon brief (no blockers),
 - read prior iteration records to see what's already been tried,
@@ -58,7 +58,7 @@ If the Inspector reports a `high`-severity finding, you may stop iterating early
 
 ### Step 3 — For each weapon, dispatch the HoldoutEvaluator (fresh context)
 
-Critical: do not paste any Attacker plan, Inspector finding, or summary into the HoldoutEvaluator's dispatch prompt. It runs from a fresh context with only `run_id`, `weapon_id`, the SUT `url`, and `users_path`. The subagent will:
+Critical: do not paste any Attacker plan, Inspector finding, or summary into the HoldoutEvaluator's dispatch prompt. It runs from a fresh context with only `run_id`, `weapon_id`, the SUT `url`, and `user_headers`. The subagent will:
 
 - call `get_weapon(weapon_id)` to read the blockers,
 - derive one acceptance plan per blocker, execute each, and append a `HoldoutResult` via `record_holdout_result`,

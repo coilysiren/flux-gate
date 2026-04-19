@@ -27,7 +27,7 @@ Gauntlet exposes seven MCP tools. The host drives them in roughly this order:
 
 2. **Per iteration** (typically four - baseline → boundary → adversarial_misuse → targeted_escalation):
    - **Attacker context** (reads `WeaponBrief` only): compose one or more `Plan`s targeting the weapon's surface, drawing on prior iteration results.
-   - **Drone** (via MCP): `execute_plan(url, plan, users_path)` → `ExecutionResult`. Repeat per plan.
+   - **Drone** (via MCP): `execute_plan(url, plan, user_headers)` → `ExecutionResult`. Repeat per plan.
    - **Inspector context** (reads `ExecutionResult`s, not blockers): produce `Finding`s. Optionally mark some as `is_anomaly=True`.
    - Append an `IterationRecord` bundling the spec, plans, results, and findings.
 
@@ -71,21 +71,9 @@ Tips:
 
 ## User authentication
 
-If your API uses authentication, create `.gauntlet/users.yaml` with per-user credentials. Credentials themselves stay in env vars; the YAML just names them. See [README - User authentication](../README.md#user-authentication).
+If the SUT requires authentication, the orchestrator passes `user_headers` to `execute_plan`: a `dict[str, dict[str, str]]` mapping user names to per-user request headers, e.g. `{"alice": {"Authorization": "Bearer ..."}}`. Users without an entry fall back to the default `X-User: <name>` header.
 
-```yaml
-# .gauntlet/users.yaml
-users:
-  alice:
-    type: bearer
-    token_env: ALICE_TOKEN
-  bob:
-    type: api_key
-    header: X-API-Key
-    key_env: BOB_API_KEY
-```
-
-Users omitted from the file fall back to the default `X-User: <name>` header.
+LUCA's orchestrator already holds these credentials (it provisioned them during deployment), so it passes them in directly — no `.gauntlet/users.yaml` file needed.
 
 ## Interpreting results and acting
 

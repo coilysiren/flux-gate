@@ -17,7 +17,7 @@ Inputs you should receive, and only these:
 - `run_id` — opaque id of the active run buffer
 - `weapon_id` — the weapon to evaluate
 - `url` — base URL of the SUT
-- `users_path` — optional path to user credentials YAML
+- `user_headers` — optional `dict[str, dict[str, str]]` mapping user names to per-user request headers
 
 ## Your loop
 
@@ -39,7 +39,7 @@ Inputs you should receive, and only these:
    }
    ```
 
-3. Execute each plan: `execute_plan(url, plan, users_path)` → `ExecutionResult`.
+3. Execute each plan: `execute_plan(url, plan, user_headers)` → `ExecutionResult`.
 
 4. Append each result to the holdout buffer:
 

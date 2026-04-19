@@ -101,7 +101,6 @@ Return to the user (or orchestrator):
 
 - It does not run the adversarial loop. Authoring and running are separate concerns; the host composes them.
 - It does not score the authored weapons for coverage. (That's a future feature; for now, human review.)
-- It does not write users.yaml.
 - It does not invoke any LLM other than itself — no API calls, no separate Anthropic/OpenAI clients.
 - It does not modify weapons that already exist in `.gauntlet/weapons/`. If a weapon with the same id is already there, surface the conflict and let the user decide; don't overwrite.
 

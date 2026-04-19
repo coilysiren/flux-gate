@@ -1,5 +1,4 @@
 from .adapters import Adapter, HttpApi
-from .auth import ApiKeyAuth, BearerAuth, UsersConfig, to_user_headers
 from .executor import Drone
 from .loop import aggregate_final_clearance, build_risk_report
 from .models import (
@@ -30,10 +29,8 @@ from .runs import RunStore
 __all__ = [
     "Action",
     "Adapter",
-    "ApiKeyAuth",
     "Assertion",
     "AssertionResult",
-    "BearerAuth",
     "Clearance",
     "Drone",
     "ExecutionResult",
@@ -52,11 +49,9 @@ __all__ = [
     "RiskReport",
     "RunStore",
     "Target",
-    "UsersConfig",
     "Weapon",
     "WeaponBrief",
     "WeaponReport",
     "aggregate_final_clearance",
     "build_risk_report",
-    "to_user_headers",
 ]

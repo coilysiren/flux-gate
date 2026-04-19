@@ -20,7 +20,6 @@ import yaml
 from mcp.server.fastmcp import FastMCP
 
 from .adapters import HttpApi
-from .auth import UsersConfig, to_user_headers
 from .executor import Drone
 from .loop import aggregate_final_clearance, build_risk_report
 from .models import (
@@ -40,7 +39,6 @@ from .runs import DEFAULT_RUNS_PATH, RunStore
 mcp = FastMCP("gauntlet")
 
 _DEFAULT_WEAPONS_PATH = ".gauntlet/weapons"
-_DEFAULT_USERS_PATH = ".gauntlet/users.yaml"
 
 _run_store = RunStore(DEFAULT_RUNS_PATH)
 
@@ -63,14 +61,6 @@ def _load_weapons(weapons_path: str) -> list[Weapon]:
     if path.is_dir():
         return _load_weapons_from_dir(path)
     return [Weapon(**yaml.safe_load(path.read_text()))]
-
-
-def _load_user_headers(users_path: str) -> dict[str, dict[str, str]]:
-    path = Path(users_path)
-    if not path.exists():
-        return {}
-    data = yaml.safe_load(path.read_text())
-    return to_user_headers(UsersConfig(**data))
 
 
 @mcp.tool()
@@ -101,16 +91,16 @@ def get_weapon(weapon_id: str, weapons_path: str = _DEFAULT_WEAPONS_PATH) -> Wea
 def execute_plan(
     url: str,
     plan: Plan,
-    users_path: str = _DEFAULT_USERS_PATH,
+    user_headers: dict[str, dict[str, str]] | None = None,
 ) -> ExecutionResult:
     """Execute a plan against a live HTTP API and return the result.
 
-    ``url`` is the base URL of the SUT. ``users_path`` is an optional YAML
-    file resolving user names to credentials (see auth.py); if omitted or
-    missing, the Drone sends an ``X-User: <name>`` header fallback.
+    ``url`` is the base URL of the SUT. ``user_headers`` maps a user name to
+    the request headers that authenticate that user (e.g.
+    ``{"alice": {"Authorization": "Bearer ..."}}``). Users without an entry
+    fall back to the default ``X-User: <name>`` header.
     """
-    user_headers = _load_user_headers(users_path)
-    drone = Drone(HttpApi(url, user_headers=user_headers))
+    drone = Drone(HttpApi(url, user_headers=user_headers or {}))
     return drone.run_plan(plan)
 
 

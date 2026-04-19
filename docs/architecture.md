@@ -14,7 +14,6 @@ gauntlet/
 │                #   (Action/Observation wrap HttpRequest/HttpResponse for
 │                #   surface-agnostic execution; HoldoutResult wraps an
 │                #   ExecutionResult with the blocker it tested)
-├── auth.py      # user authentication config (BearerAuth, ApiKeyAuth, UsersConfig)
 ├── adapters/    # Adapter protocol + HttpApi (the only execution surface)
 │   ├── __init__.py   # Adapter protocol (send + execute)
 │   └── http.py       # HttpApi — real HTTP requests via `requests`
@@ -27,15 +26,11 @@ gauntlet/
 Dependency order:
 
 ```
-models  ←  auth
-models  ←  adapters (http, cli, webdriver, __init__)
-models  ←  openapi
-models  ←  roles
-models  ←  store
+models  ←  adapters
 models  ←  runs
 models + adapters  ←  executor
 models  ←  loop
-models + auth + executor + loop + adapters + runs  ←  server
+models + executor + loop + adapters + runs  ←  server
 ```
 
 Nothing imports from `server.py`. The MCP entry point (`main()` in `server.py`) runs `FastMCP.run()` which speaks stdio to the Claude Code process that launched it.
@@ -61,7 +56,7 @@ The skills are pure prose (no executable code); they encode role discipline that
 |---|---|---|
 | `list_weapons(weapons_path)` | `list[WeaponBrief]` (no blockers) | reads YAML from disk |
 | `get_weapon(weapon_id, weapons_path)` | `Weapon` (with blockers) | reads YAML from disk |
-| `execute_plan(url, plan, users_path)` | `ExecutionResult` | sends real HTTP requests to the SUT |
+| `execute_plan(url, plan, user_headers)` | `ExecutionResult` | sends real HTTP requests to the SUT |
 | `start_run(weapon_ids, runs_path)` | `{run_id}` | creates `runs_path/<run_id>/` |
 | `record_iteration(run_id, weapon_id, iteration_record, runs_path)` | `{status: ok}` | appends one `IterationRecord` to the buffer |
 | `read_iteration_records(run_id, weapon_id, runs_path)` | `list[IterationRecord]` | reads from the buffer |
@@ -147,8 +142,6 @@ The host itself is non-deterministic (it's an LLM agent), but Gauntlet doesn't r
 **Why Pydantic?** All interchange objects are `BaseModel` subclasses with `extra="forbid"`. This catches schema drift early and makes JSON serialization/deserialization free - including over the MCP tool boundary.
 
 **Why Protocols instead of ABCs?** Structural subtyping lets callers pass any object that has the right methods without importing from `gauntlet`. Only `Adapter` remains as a protocol now that Attacker/Inspector are host-driven.
-
-**Why separate auth.py?** User credentials involve secret resolution from env vars. Isolating this in `auth.py` keeps the rest of the codebase free of secret-handling logic.
 
 **Why Action/Observation instead of passing HttpRequest/HttpResponse directly?** Carryover from when the adversarial loop was meant to span multiple surfaces (HTTP, CLI, WebDriver). With LUCA targeting HTTP-only, the wrapper is vestigial; a follow-up commit will inline it.
 

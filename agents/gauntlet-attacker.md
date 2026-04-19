@@ -17,7 +17,7 @@ The Orchestrator passes you, in your dispatch prompt:
 - `iteration_spec` — name (`baseline` / `boundary` / `adversarial_misuse` / `targeted_escalation`), goal, attacker_prompt
 - `url` — base URL of the SUT
 - `target` — the API surface (endpoints) to focus on, if any
-- `users_path` — optional path to user credentials YAML
+- `user_headers` — optional `dict[str, dict[str, str]]` mapping user names to per-user request headers
 
 ## Train/test split (load-bearing)
 
@@ -57,7 +57,7 @@ Findings you read may include `evidence` and `reproduction_steps` — those are 
    - `step_index` is 1-based.
    - `kind: status_code` requires integer `expected` and null `rule`; `kind: rule` requires a `rule` name and null `expected`.
 
-4. Execute each plan: `execute_plan(url, plan, users_path)` → `ExecutionResult`. Collect them.
+4. Execute each plan: `execute_plan(url, plan, user_headers)` → `ExecutionResult`. Collect them.
 
 5. Append the iteration to the buffer:
 

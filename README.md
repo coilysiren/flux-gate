@@ -47,7 +47,7 @@ Without the skill, a host could still call the MCP tools ad-hoc, but it would ha
 |---|---|---|
 | `list_weapons(weapons_path)` | List attacker-safe `WeaponBrief`s (no blockers) | Orchestrator, Attacker |
 | `get_weapon(weapon_id, weapons_path)` | Return full weapon including blockers | Orchestrator, HoldoutEvaluator |
-| `execute_plan(url, plan, users_path)` | Deterministically run a `Plan` against the SUT | Orchestrator, Attacker, HoldoutEvaluator |
+| `execute_plan(url, plan, user_headers)` | Deterministically run a `Plan` against the SUT | Orchestrator, Attacker, HoldoutEvaluator |
 | `start_run(weapon_ids)` | Initialize a per-run iteration + holdout buffer; returns an opaque `run_id` | Orchestrator |
 | `record_iteration(run_id, weapon_id, iteration_record)` | Append an `IterationRecord` to the run buffer (rejects findings that carry blocker text) | Attacker, Inspector |
 | `read_iteration_records(run_id, weapon_id)` | Read prior `IterationRecord`s for one weapon in this run | Attacker, Inspector |
@@ -65,10 +65,9 @@ Gauntlet reads configuration from a `.gauntlet/` directory at the root of the pr
 ```
 your-project/
 ├── .gauntlet/
-│   ├── weapons/           # one YAML file per Weapon
-│   │   ├── task_ownership.yaml
-│   │   └── task_read_isolation.yaml
-│   └── users.yaml         # optional: per-user auth credentials
+│   └── weapons/           # one YAML file per Weapon
+│       ├── task_ownership.yaml
+│       └── task_read_isolation.yaml
 └── ...
 ```
 
@@ -92,26 +91,7 @@ blockers:
 
 ### User authentication
 
-Create `.gauntlet/users.yaml` to provide per-user credentials. Secret values are never stored in the file - each entry names an environment variable that holds the actual credential. Users omitted from the file fall back to the default `X-User: <name>` header.
-
-```yaml
-# .gauntlet/users.yaml
-users:
-  alice:
-    type: bearer
-    token_env: ALICE_TOKEN
-  bob:
-    type: api_key
-    header: X-API-Key
-    key_env: BOB_API_KEY
-```
-
-Supported authentication types:
-
-| Type | Fields | Header sent |
-|---|---|---|
-| `bearer` | `token_env` | `Authorization: Bearer <$token_env>` |
-| `api_key` | `header`, `key_env` | `<header>: <$key_env>` |
+If the SUT requires authentication, the orchestrator passes `user_headers` to `execute_plan`: a `dict[str, dict[str, str]]` mapping user names to per-user request headers, e.g. `{"alice": {"Authorization": "Bearer ..."}}`. Users without an entry fall back to the default `X-User: <name>` header.
 
 ## Core Model
 
