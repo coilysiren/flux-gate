@@ -1,0 +1,18 @@
+id: webhook_authenticity
+title: Webhook deliveries are authenticated end-to-end, not just on the sender side
+inspired_by: https://webhooks.fyi/security/
+description: >
+  Test whether both halves of a webhook integration prove authenticity.
+  Outbound: does the SUT sign webhook deliveries (HMAC over body +
+  timestamp, or mTLS) so the receiver can verify? Inbound: when the SUT
+  receives webhooks from a third party (Stripe, GitHub, Slack), does it
+  verify the signature, replay-protect via timestamp, and reject
+  deliveries whose signing key has been rotated? Failure modes: missing
+  signature entirely, validation that accepts the HMAC but not the
+  timestamp (so replays work), an accept-any-signature bypass under
+  debug flags, or a "verify in staging, skip in prod" toggle.
+blockers:
+  - Inbound webhook deliveries with a missing, malformed, or mismatched signature header are rejected with 401 before any side effect is applied
+  - Inbound webhook deliveries whose timestamp is outside a bounded freshness window (e.g. ±5 minutes) are rejected, preventing replay
+  - Outbound webhook deliveries include a signature header computed over body + timestamp with a secret the recipient has out-of-band
+  - A rotated signing key invalidates previously-valid signatures within a documented grace window, rather than the old key continuing to verify forever

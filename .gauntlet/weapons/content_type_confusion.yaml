@@ -1,0 +1,18 @@
+id: content_type_confusion
+title: Content-Type mismatches between request and parser cannot be exploited
+inspired_by: https://datatracker.ietf.org/doc/html/rfc9110#name-content-type
+description: >
+  Test whether the API's parsing layer honors the declared Content-Type
+  and rejects mismatches. Attackers send XML with Content-Type
+  application/json, upload a script with image/png, or omit the header
+  entirely hoping the server sniffs and picks the wrong parser.
+  Related vectors: JSON arrays parsed as objects, multipart fields
+  coerced into typed fields, response Content-Type that doesn't match
+  the actual body (letting the browser sniff), X-Content-Type-Options
+  absent on user-controlled uploads. A safe API is strict about
+  incoming Content-Type and precise about outgoing Content-Type.
+blockers:
+  - Requests where the Content-Type header does not match the body format are rejected with 415, not silently parsed as one format or another
+  - Uploaded files are served back with a Content-Type that reflects the actual file type, not a user-controlled header, and with X-Content-Type-Options nosniff
+  - Requests missing a Content-Type on a body-accepting endpoint are rejected, not assumed to be the default
+  - JSON payloads that are arrays, scalars, or malformed where an object is expected are rejected with 400, not coerced into an object

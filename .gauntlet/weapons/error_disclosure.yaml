@@ -1,0 +1,16 @@
+id: error_disclosure
+title: Error responses do not leak internal structure, paths, stack traces, or dependency versions
+inspired_by: https://owasp.org/www-community/Improper_Error_Handling
+description: >
+  Test whether error paths expose information the attacker shouldn't
+  have. Uncaught exceptions, 500s, malformed-input handlers, and
+  auth-failure branches often accidentally surface stack traces, DB
+  error strings, internal hostnames, source file paths, library
+  versions, or object IDs the caller couldn't otherwise enumerate.
+  A safe API returns a bounded, caller-appropriate error payload and
+  logs the rich detail server-side.
+blockers:
+  - Responses to malformed inputs do not include a stack trace, DB error text, internal module path, or source filename
+  - 500-class responses return a generic error shape, not an ORM-formatted validation dump or SQL syntax error
+  - Auth failure responses do not distinguish "user not found" from "wrong password" — both return the same generic message
+  - Error response headers do not leak framework name, framework version, or internal server names (no Server, X-Powered-By, or X-AspNet-Version disclosure)

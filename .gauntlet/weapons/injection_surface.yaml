@@ -1,0 +1,17 @@
+id: injection_surface
+title: User-supplied input cannot escape its parameter slot and execute as code or query
+inspired_by: https://cheatsheetseries.owasp.org/cheatsheets/Injection_Prevention_Cheat_Sheet.html
+description: >
+  Test whether user-controlled values stay contained within the
+  parameter, row, or template slot they were meant to occupy. Classic
+  injection: a string that looks innocent in one layer ('; DROP TABLE,
+  {{ 7*7 }}, $where, $(reboot)) is re-interpreted as syntax by a
+  downstream layer — SQL, NoSQL query operators, shell, template
+  engine, LDAP filter, JSON parser. A safe API uses parameterized
+  queries, typed deserialization, and templating libraries that
+  auto-escape, regardless of what the caller sends.
+blockers:
+  - SQL metacharacters in string parameters do not change the number of rows affected or the shape of the returned data
+  - JSON bodies containing NoSQL operator keys ($ne, $gt, $where) are either rejected or treated as literal strings, not as query operators
+  - Strings containing shell metacharacters, null bytes, or command substitution do not cause observable side effects on the server
+  - Template-like fragments ({{ }}, ${ }, #{ }) echoed back in responses are rendered literally, not evaluated

@@ -1,0 +1,19 @@
+id: cache_inconsistency
+title: Cached responses respect authorization and freshness boundaries
+inspired_by: https://datatracker.ietf.org/doc/html/rfc9111
+description: >
+  Test whether caching layers (CDN, reverse proxy, HTTP caching headers,
+  application-layer memoization) correctly scope and invalidate entries.
+  Attack shapes: a response cached under a shared key leaks one user's
+  data to another; Vary headers miss Authorization, so a private
+  response gets stored as public; stale-while-revalidate returns a
+  privileged response to an unauthenticated caller; cache keys omit
+  tenant / locale / feature-flag axes that affect the body; writes
+  don't invalidate matching cached reads, so the client reads stale
+  state. A safe API tags private responses private, varies on auth,
+  and invalidates or revalidates after writes.
+blockers:
+  - "Responses carrying per-user data are emitted with Cache-Control: private (or no-store) and never served from a shared cache to a different user"
+  - Cached responses key on every input axis that influences the body (tenant, locale, feature flags, auth scope) — swapping one axis never returns a stale response from the other
+  - A successful write on a resource invalidates or revalidates cached reads of that resource within a bounded window, not indefinitely stale
+  - Unauthenticated probes cannot extract a privileged response from any cache tier by guessing a cache key that would have matched a privileged caller

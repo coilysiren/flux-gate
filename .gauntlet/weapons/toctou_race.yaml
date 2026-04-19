@@ -1,0 +1,17 @@
+id: toctou_race
+title: Concurrent requests cannot bypass an invariant via a time-of-check-to-time-of-use race
+inspired_by: https://en.wikipedia.org/wiki/Time-of-check_to_time-of-use
+description: >
+  Test whether the API's safety checks hold under concurrent access.
+  Classic TOCTOU: balance ≥ cost is checked at time T, then the debit
+  lands at T+Δ. Two concurrent requests can both pass the check before
+  either writes, both debit, and the invariant breaks. The attack
+  surface is any write that reads state, compares it, then mutates —
+  and that isn't wrapped in a database transaction or optimistic
+  concurrency check. Examples: spend-down balances, quota decrement,
+  unique-name claim, first-come slot reservation.
+blockers:
+  - Two concurrent requests that race on the same unique constraint cannot both succeed; exactly one wins and the other sees 409 or 422
+  - Concurrent spend-down against a limited resource leaves the remaining quantity consistent (no double-spend, no negative balance)
+  - A request that lost a race observes the post-conflict state on its next read, not a stale snapshot
+  - Retrying a losing request with the same idempotency key does not re-apply the mutation

@@ -1,0 +1,16 @@
+id: pagination_exhaustion
+title: Pagination parameters cannot be coerced into full-table scans or cross-user disclosure
+inspired_by: https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html
+description: >
+  Test whether list endpoints are robust to adversarial pagination.
+  Attackers probe the edges: huge page sizes, negative offsets, hand-crafted
+  cursor values, missing filters that default to "all users' data",
+  and cursors borrowed from a privileged session. A safe list endpoint
+  caps page size, validates cursor tokens as opaque server-signed
+  values, scopes results to the caller's tenant / user, and rejects
+  pagination input that doesn't fit its documented shape.
+blockers:
+  - Requesting an enormous page size (10_000, 1e9, -1) does not return an unbounded result set — the server clamps, rejects, or errors
+  - A cursor forged by the attacker (hand-edited, re-used across users, from a different resource) is rejected, not honored
+  - List results for an unauthenticated or lower-privileged session never contain items owned by a different user or tenant
+  - Pagination continues to return consistent, non-overlapping pages under concurrent writes — items aren't skipped or duplicated

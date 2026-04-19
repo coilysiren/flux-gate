@@ -1,0 +1,17 @@
+id: verb_tampering
+title: HTTP methods outside the endpoint's contract are rejected, not silently interpreted
+inspired_by: https://owasp.org/www-community/vulnerabilities/HTTP_Verb_Tampering
+description: >
+  Test whether endpoints honor only the HTTP methods they document.
+  Classic verb tampering: auth middleware checks POST but not PUT, so
+  PUT /admin/users bypasses the check. Other flavors: HEAD returning
+  a body that a GET wouldn't authorize; TRACE leaking request state;
+  OPTIONS enumerating routes an unauthorized caller shouldn't know
+  exist; method-override headers (X-HTTP-Method-Override) smuggling a
+  privileged verb inside a non-privileged one. A safe API enforces its
+  method allowlist before authorization, after routing, uniformly.
+blockers:
+  - Sending an undocumented method (PUT to a GET-only endpoint, DELETE to a read-only endpoint) returns 405 with an Allow header, not the success or body of a different verb
+  - HEAD responses carry the same headers a GET would return but never include a body — auth decisions don't differ between HEAD and GET
+  - Method-override headers (X-HTTP-Method-Override, _method query param) are either not honored or are processed before authorization, not after
+  - OPTIONS responses do not disclose endpoints the caller is not authorized to know about

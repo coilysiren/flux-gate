@@ -1,0 +1,17 @@
+id: tenant_isolation
+title: Data and configuration are strictly scoped to the caller's tenant, never leaking across
+inspired_by: https://cloud.google.com/architecture/multi-tenant-saas-environments-on-gcp
+description: >
+  Test whether a multi-tenant API enforces tenant boundaries everywhere,
+  not just at the obvious read paths. Failure modes: a list endpoint
+  defaults to "all tenants" when no filter is supplied; tenant id is
+  inferred from a caller-controllable header and can be swapped; a
+  cross-tenant reference (e.g. a shared resource id) inadvertently
+  exposes another tenant's data; audit logs, usage counters, or admin
+  APIs don't carry tenant scope. Shared-database, pool-model architectures
+  are especially prone: one missed WHERE tenant_id = ? is the whole bug.
+blockers:
+  - A caller authenticated into tenant A cannot retrieve, list, modify, or delete any resource belonging to tenant B
+  - Tenant-scoping is derived from the caller's session / token, not from a caller-controllable header that can be swapped
+  - Cross-tenant references (shared images, shared configuration) surface in responses only when the caller's tenant is authorized for them
+  - Usage metrics, audit logs, and admin-facing APIs all scope results to the caller's tenant; no cross-tenant aggregate leaks

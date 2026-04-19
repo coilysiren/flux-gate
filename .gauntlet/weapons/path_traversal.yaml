@@ -1,0 +1,18 @@
+id: path_traversal
+title: Path parameters cannot escape their intended resource scope
+inspired_by: https://owasp.org/www-community/attacks/Path_Traversal
+description: >
+  Test whether path segments accepted as parameters are confined to the
+  resources the caller is authorized to address. Classic vectors: ../
+  sequences, encoded variants (%2e%2e%2f, %252e%252e), backslashes on
+  servers that normalize them, null-byte truncation, unicode
+  equivalents for the path separator, absolute-path substitution. Any
+  endpoint that builds a filesystem path, an S3 key, a redirect target,
+  or an internal URL from caller input is a candidate. A safe API
+  normalizes, resolves, then verifies the result stays inside the
+  allowed prefix before touching the underlying resource.
+blockers:
+  - Path parameters containing ../, backslashes, encoded equivalents, or absolute paths are rejected, not resolved against the filesystem / object store
+  - Resources served by path name cannot be addressed via an alternate encoding to produce a different resource than the canonical form
+  - An unauthenticated or lower-privileged caller cannot read files, objects, or redirects that a path-traversal attempt could otherwise reach
+  - Responses to traversal attempts return a consistent error, not a 500 with a stack trace or an inadvertent success

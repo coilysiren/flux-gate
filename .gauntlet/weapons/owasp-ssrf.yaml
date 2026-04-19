@@ -1,0 +1,16 @@
+id: owasp_ssrf
+title: "API7: Server-Side Request Forgery"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/
+description: >
+  Test whether the API can be coerced into issuing outbound requests on
+  the attacker's behalf. Any endpoint that accepts a URL, hostname, or
+  file reference and fetches it server-side is an SSRF surface — webhook
+  registrations, image imports, link previews, OAuth callbacks, file
+  imports, and PDF renderers are classic examples. A safe API validates
+  the target against an allowlist, forbids internal IP ranges and
+  loopback, and refuses non-http(s) schemes.
+blockers:
+  - Requests to fetch URLs pointing at private / loopback / link-local address ranges are rejected before any connection is attempted
+  - Non-http(s) schemes (file://, gopher://, ftp://, jar://) are rejected with a clear error rather than followed
+  - Redirects from an allowed target to a private address are not followed, or are re-validated at each hop
+  - Error messages do not leak the response body or connection metadata of the upstream target

@@ -1,0 +1,15 @@
+id: owasp_unrestricted_resource_consumption
+title: "API4: Unrestricted Resource Consumption"
+inspired_by: https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/
+description: >
+  Test whether the API caps expensive or unbounded operations. Attackers
+  trigger heavy work — requesting huge page sizes, repeating the same
+  costly call in tight loops, uploading oversized bodies, or exercising
+  endpoints that fan out to many backend operations — until the service
+  degrades or collapses. The API should enforce rate limits, pagination
+  caps, body-size limits, and timeouts on expensive work.
+blockers:
+  - Requests for page sizes well above a documented cap are rejected or silently clamped, not honored literally
+  - Repeated identical requests within a short window start returning 429 once a rate threshold is crossed
+  - Request bodies larger than a documented maximum are rejected with 413, not accepted and parsed
+  - Expensive operations (fan-out, aggregation, exports) complete within a bounded time or stream partial results, rather than hanging indefinitely

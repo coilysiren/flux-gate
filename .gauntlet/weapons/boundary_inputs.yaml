@@ -1,0 +1,17 @@
+id: boundary_inputs
+title: Inputs at and beyond documented limits are rejected cleanly, not misinterpreted
+inspired_by: https://en.wikipedia.org/wiki/Boundary_testing
+description: >
+  Test whether the API handles the edges of its input space — empty
+  strings, values exactly at documented min/max, values one beyond,
+  integer overflows, negative and zero counts, unicode oddities
+  (combining characters, RTL overrides, zero-width joiners, emoji),
+  embedded null bytes, very long strings, nested JSON depth, numeric
+  precision at the float-to-int boundary. A safe API enforces explicit
+  bounds, returns a clear 400 when they're violated, and doesn't
+  silently truncate, overflow, or misinterpret.
+blockers:
+  - Numeric fields reject values above the documented max and below the min with 400, not silently clamp or overflow
+  - String fields beyond the documented length limit are rejected with 400, not silently truncated server-side
+  - Zero-length and whitespace-only strings are either accepted as valid inputs or rejected with a clear error — never stored and then rendered as an empty UI element
+  - Strings containing null bytes, RTL-override characters, or deeply nested unicode normalize consistently or are rejected; they do not produce a different resource on read than on write
