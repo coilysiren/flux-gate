@@ -58,7 +58,7 @@ Two valid configurations:
 ### CLI
 
 ```
-gauntlet [url] [--config FILE] [--arsenal FILE] [--weapon FILE_OR_DIR] [--target FILE_OR_DIR] [--openapi FILE] [--users FILE] [--threshold N] [--no-fail-fast]
+gauntlet [url] [--config FILE] [--arsenal FILE] [--weapon FILE_OR_DIR] [--target FILE_OR_DIR] [--openapi FILE] [--users FILE] [--threshold N] [--no-fail-fast] [--format yaml|json]
 ```
 
 | Argument | Default | Description |
@@ -72,16 +72,18 @@ gauntlet [url] [--config FILE] [--arsenal FILE] [--weapon FILE_OR_DIR] [--target
 | `--users` | `.gauntlet/users.yaml` | Path to an [users YAML](#user-authentication) file |
 | `--threshold` | `0.90` | Holdout satisfaction score required to recommend merge |
 | `--fail-fast` / `--no-fail-fast` | enabled | Stop at the first critical finding; use `--no-fail-fast` to run all iterations |
+| `--format` | `yaml` | Output format for the run report: `yaml` or `json` |
 
 ```bash
 gauntlet http://localhost:8000
 gauntlet http://localhost:8000 --no-fail-fast
 gauntlet http://localhost:8000 --openapi openapi.yaml
 gauntlet http://localhost:8000 --arsenal .gauntlet/arsenal.yaml
+gauntlet http://localhost:8000 --format json
 gauntlet --config .gauntlet/config.yaml
 ```
 
-Output is YAML:
+Output defaults to YAML; pass `--format json` for machine-friendly JSON:
 
 ```yaml
 risk_report:

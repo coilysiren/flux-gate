@@ -19,6 +19,10 @@ gauntlet/
 ├── llm.py       # LLMAttacker and LLMInspector backed by OpenAI or Anthropic
 ├── loop.py      # GauntletRunner orchestration + risk report assembly
 ├── store.py     # PlanStore and FindingsStore — disk-backed knowledge indexed by weapon ID
+├── schemas/     # JSON Schemas generated from Pydantic models (Weapon, Target,
+│                #   Arsenal, UsersConfig) — committed so external tooling can
+│                #   validate user-authored YAML without importing the package.
+│                #   Regenerate with `uv run python scripts/export_schemas.py`.
 └── cli.py       # Click entry point — reads env vars, loads config, runs GauntletRunner
 ```
 
@@ -30,6 +34,7 @@ models  ←  adapters (http, cli, webdriver, __init__)
 models  ←  openapi
 models  ←  roles
 models  ←  store
+models + auth  ←  schemas
 models + adapters  ←  executor
 models + roles + executor + store  ←  loop
 models + auth + openapi + roles + executor + llm + loop  ←  cli
@@ -134,3 +139,40 @@ of Weapons that can be versioned, shared, and loaded with one flag
 (``--arsenal``). Without arsenals, users would need to list every weapon file
 on the command line or maintain a wrapper script.  The CLI falls back to
 ``--weapon`` for individual weapon files when no arsenal is specified.
+
+## Artifact directory layout
+
+The CLI writes every machine-readable run artifact under a single root
+directory, controlled by ``--artifact-dir`` (default ``.gauntlet/artifacts``).
+An orchestrator invoking Gauntlet as a subprocess can point this flag at a
+scratch directory and then read everything back from known locations without
+parsing stdout.
+
+```
+{artifact_dir}/
+├── plans/
+│   └── {weapon_id}/
+│       └── {plan_name}.yaml          # PlanStore — reused across runs
+├── findings/
+│   └── {weapon_id}/
+│       └── {issue}.yaml              # FindingsStore — one file per issue
+└── runs/
+    ├── {weapon_slug}__{target_slug}.{yaml,json}   # one file per (weapon, target)
+    └── latest.{yaml,json}            # always the most recent run
+```
+
+Rules:
+
+- Paths are stable. A consumer can glob ``{artifact_dir}/runs/*.yaml`` (or
+  ``*.json`` when ``--format json`` is set) to discover all runs from a single
+  invocation.
+- ``{weapon_slug}`` is the weapon's ``id`` (already snake_case) or
+  ``no_weapon`` when no weapon was configured. ``{target_slug}`` is a lowercase
+  underscore slug of ``target.title`` or ``no_target``.
+- ``runs/latest.{ext}`` is overwritten on every run so a consumer that only
+  cares about the last result has a single fixed path to read.
+- The ``plans/`` and ``findings/`` trees accumulate across invocations and are
+  indexed by weapon id; they are the persistence layer that ``PlanStore`` and
+  ``FindingsStore`` read on startup.
+- The extension of files in ``runs/`` matches ``--format`` (``yaml`` or
+  ``json``). ``plans/`` and ``findings/`` are always YAML.

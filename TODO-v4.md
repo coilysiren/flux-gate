@@ -9,9 +9,9 @@ Companion context: the consumer's architecture-design doc frames Gauntlet as its
 Gauntlet is already usable from an orchestrator via the CLI, but the contract isn't yet specified crisply enough that an external agent can target it blindly.
 
 - [ ] **Versioned risk-report schema.** Add `risk_report.schema_version: 1` (or equivalent) to the YAML output. Document semver-style compatibility rules. Orchestrators pin against the version; we can evolve the shape without breaking them.
-- [ ] **`--json` output flag.** Orchestrators generally prefer JSON for programmatic consumption. YAML stays the default for humans; `--format json` (or `--json`) emits the same risk-report structure as JSON.
+- [x] **`--json` output flag.** Orchestrators generally prefer JSON for programmatic consumption. YAML stays the default for humans; `--format json` (or `--json`) emits the same risk-report structure as JSON.
 - [x] **Stable, documented exit-code taxonomy.** Today: non-zero means "failure or critical finding." An orchestrator wants to distinguish "Gauntlet itself errored" (config missing, LLM unreachable) from "Gauntlet ran and found critical failures" from "ran clean, promote." Define: `0` = clearance, `1` = blocked by findings, `2` = runtime error, `3` = config/usage error. Document in usage.md.
-- [ ] **Machine-readable artifact directory contract.** PlanStore and FindingsStore already write to disk; add a `--artifact-dir` flag so an orchestrator can pick the path and find everything at known locations. Document the layout in architecture.md.
+- [x] **Machine-readable artifact directory contract.** PlanStore and FindingsStore already write to disk; add a `--artifact-dir` flag so an orchestrator can pick the path and find everything at known locations. Document the layout in architecture.md.
 - [ ] **Streaming progress output.** Long runs stall the orchestrator UI. Add an opt-in streaming mode (`--stream ndjson`) that emits one JSON event per iteration / finding / plan so a consumer can render live progress. Current all-at-end YAML stays the default.
 - [ ] **Idempotency / resumability.** If a run crashes mid-iteration, can the orchestrator resume? Today: no. Consider a `--resume <run-id>` that reads PlanStore / FindingsStore state and picks up. Git-as-checkpoint is the consumer's idiom; our artifact store is the analog inside Gauntlet.
 
@@ -37,7 +37,7 @@ The consumer's v0 constrains to HTTP platforms (Slack-likes, TODO lists). But th
 
 The consumer's Planner role derives Weapons from a product spec. Today our Weapon schema is human-authored YAML; making it machine-authorable cleanly is a win.
 
-- [ ] **Publish a JSON Schema for Weapon YAML.** Ship `gauntlet/schemas/weapon.schema.json` so Planners can validate their output before running Gauntlet. Same for Target, Arsenal, users config.
+- [x] **Publish a JSON Schema for Weapon YAML.** Ship `gauntlet/schemas/weapon.schema.json` so Planners can validate their output before running Gauntlet. Same for Target, Arsenal, users config.
 - [ ] **`gauntlet validate` subcommand.** Dry-run: read the `.gauntlet/` directory, report schema violations, duplicate IDs, orphan targets. Orchestrators use this as a preflight gate.
 - [ ] **Weapon-from-spec scaffolding helper.** An optional `gauntlet scaffold-weapon --description "users cannot modify each other's tasks"` that emits a Weapon YAML with blockers inferred from the description. The Planner still owns the authoritative version; this is a starting point, not a replacement.
 - [ ] **Inline assertions inside Weapons for the train/test split.** Already in place via `blockers`; document explicitly that the Planner is the only authoring role and the Worker must not read the weapon files. (Usage.md now covers the workflow; a stronger statement in the Weapon schema itself — a comment or policy doc — would reinforce it.)

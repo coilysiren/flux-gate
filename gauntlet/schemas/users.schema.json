@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "ApiKeyAuth": {
+      "additionalProperties": false,
+      "description": "Arbitrary header authentication (e.g. ``X-API-Key``, ``X-Auth-Token``).\n\n``key_env`` is the name of the environment variable that holds the key value.\nThe actual secret is never written to the config file.",
+      "properties": {
+        "header": {
+          "title": "Header",
+          "type": "string"
+        },
+        "key_env": {
+          "title": "Key Env",
+          "type": "string"
+        },
+        "type": {
+          "const": "api_key",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "header",
+        "key_env"
+      ],
+      "title": "ApiKeyAuth",
+      "type": "object"
+    },
+    "BearerAuth": {
+      "additionalProperties": false,
+      "description": "HTTP Bearer token: ``Authorization: Bearer <value>``.\n\n``token_env`` is the name of the environment variable that holds the token.\nThe actual secret is never written to the config file.",
+      "properties": {
+        "token_env": {
+          "title": "Token Env",
+          "type": "string"
+        },
+        "type": {
+          "const": "bearer",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "token_env"
+      ],
+      "title": "BearerAuth",
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/coilysiren/gauntlet/schemas/users.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "User authentication configuration loaded from ``.gauntlet/users.yaml``.\n\nEach key is an user name.  Each value names the environment variables that\nhold that user's credentials \u2014 secrets are never stored in the config file.\n\nExample YAML::\n\n    users:\n      alice:\n        type: bearer\n        token_env: ALICE_TOKEN\n      bob:\n        type: api_key\n        header: X-API-Key\n        key_env: BOB_API_KEY\n\nUsers omitted from this file fall back to the default ``X-User: <name>``\nheader that ``HttpExecutor`` sends automatically.",
+  "properties": {
+    "users": {
+      "additionalProperties": {
+        "discriminator": {
+          "mapping": {
+            "api_key": "#/$defs/ApiKeyAuth",
+            "bearer": "#/$defs/BearerAuth"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/BearerAuth"
+          },
+          {
+            "$ref": "#/$defs/ApiKeyAuth"
+          }
+        ]
+      },
+      "title": "Users",
+      "type": "object"
+    }
+  },
+  "required": [
+    "users"
+  ],
+  "title": "UsersConfig",
+  "type": "object"
+}
