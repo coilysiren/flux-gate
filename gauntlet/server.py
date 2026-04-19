@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 from mcp.server.fastmcp import FastMCP
 
+from ._mutator import mutate_plans as _mutate_plans
 from .executor import Drone
 from .http import HttpApi
 from .loop import aggregate_final_clearance, build_risk_report
@@ -190,6 +191,35 @@ def read_holdout_results(run_id: str, weapon_id: str) -> list[HoldoutResult]:
 
 
 @mcp.tool()
+def mutate_plans(
+    run_id: str,
+    weapon_id: str,
+    max_variants: int = 4,
+) -> list[Plan]:
+    """Return deterministic plan variants derived from prior iterations.
+
+    Reads every ``IterationRecord`` previously appended for ``(run_id,
+    weapon_id)``, collects the unique plans across them (by ``name``), and
+    runs them through the internal mutator. The mutator applies four
+    strategies (drop a body field, rotate users, negate expected status,
+    reverse step order) and returns up to ``max_variants`` plan variants
+    whose names are suffixed with ``:mut-<strategy>``.
+
+    The Attacker subagent calls this between iterations to explore variants
+    of plans that have already landed, without spending LLM tokens on the
+    mutation step. The mutator sees only what the Attacker has already
+    seen, so there is no train/test split risk.
+    """
+    records = _run_store.read_iteration_records(run_id, weapon_id)
+    seen: dict[str, Plan] = {}
+    for record in records:
+        for plan in record.plans:
+            seen.setdefault(plan.name, plan)
+    seed_plans = list(seen.values())
+    return _mutate_plans(seed_plans, max_variants=max_variants)
+
+
+@mcp.tool()
 def replay_finding(
     run_id: str,
     weapon_id: str,
@@ -286,6 +316,7 @@ __all__ = [
     "list_weapons",
     "main",
     "mcp",
+    "mutate_plans",
     "read_holdout_results",
     "read_iteration_records",
     "record_holdout_result",
