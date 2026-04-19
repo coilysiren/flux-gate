@@ -46,40 +46,13 @@ class Drone:
         )
 
 
-# To add a new assertion kind: add the literal to Assertion.kind in models.py,
-# then add a branch below keyed on assertion.kind.
-# To add a new rule: add a branch inside the assertion.kind == "rule" block
-# keyed on assertion.rule. The rule string is set by the Attacker when it builds
-# the Assertion. Add a test case in tests/test_gauntlet.py for either.
 def _evaluate_assertion(
     assertion: Assertion, step_results: list[ExecutionStepResult]
 ) -> AssertionResult:
     step_result = step_results[assertion.step_index - 1]
-    if assertion.kind == "status_code":
-        passed = step_result.response.status_code == assertion.expected
-        return AssertionResult(
-            name=assertion.name,
-            kind=assertion.kind,
-            passed=passed,
-            detail=(
-                f"expected status {assertion.expected}, got {step_result.response.status_code}"
-            ),
-        )
-
-    if assertion.rule == "task_not_modified_by_other_user":
-        body = step_result.response.body
-        last_modified_by = body.get("last_modified_by")
-        passed = last_modified_by in (None, body.get("owner"))
-        return AssertionResult(
-            name=assertion.name,
-            kind=assertion.kind,
-            passed=passed,
-            detail=f"owner={body.get('owner')} last_modified_by={last_modified_by}",
-        )
-
+    passed = step_result.response.status_code == assertion.expected
     return AssertionResult(
         name=assertion.name,
-        kind=assertion.kind,
-        passed=False,
-        detail=f"unknown rule: {assertion.rule}",
+        passed=passed,
+        detail=f"expected status {assertion.expected}, got {step_result.response.status_code}",
     )

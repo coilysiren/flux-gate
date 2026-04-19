@@ -17,11 +17,9 @@ gauntlet/
 ├── auth.py      # user authentication config (BearerAuth, ApiKeyAuth, UsersConfig)
 ├── openapi.py   # OpenAPI 3.x spec parser - produces Target objects
 ├── roles.py     # WeaponAssessor protocol + DemoWeaponAssessor
-├── adapters/    # Adapter protocol + concrete implementations
+├── adapters/    # Adapter protocol + HttpApi (the only execution surface)
 │   ├── __init__.py   # Adapter protocol (send + execute)
-│   ├── http.py       # HttpApi (real HTTP) + InMemoryHttpApi (demo)
-│   ├── cli.py        # CliAdapter (stub)
-│   └── webdriver.py  # WebDriverAdapter (stub)
+│   └── http.py       # HttpApi — real HTTP requests via `requests`
 ├── executor.py  # Drone - runs plans via Adapter.execute(Action) → Observation
 ├── loop.py      # build_default_iteration_specs + build_risk_report helpers
 ├── runs.py      # RunStore - per-run iteration + holdout buffer (filesystem)
@@ -142,7 +140,6 @@ The Orchestrator role (the host skill itself) retains every tool but is responsi
 
 **Deterministic (no network, no LLM):**
 
-- `InMemoryHttpApi` - in-memory REST API with three seeded flaws: (1) PATCH without ownership check, (2) POST accepts invalid data types for title and missing required fields, (3) GET /tasks leaks all tasks regardless of ownership. Ships with the library as a working example SUT.
 - `Drone` - resolves path templates, calls the adapter, evaluates assertions.
 - Assertion evaluation, risk-report assembly, weapon assessment - all pure Python.
 

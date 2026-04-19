@@ -64,9 +64,8 @@ class Observation(GauntletModel):
 
 
 class Assertion(GauntletModel):
-    kind: Literal["status_code", "rule"]
+    kind: Literal["status_code"] = "status_code"
     expected: Any | None = None
-    rule: str | None = None
     step_index: int
     name: str
 
@@ -94,7 +93,7 @@ class ExecutionStepResult(GauntletModel):
 
 class AssertionResult(GauntletModel):
     name: str
-    kind: Literal["status_code", "rule"]
+    kind: Literal["status_code"] = "status_code"
     passed: bool
     detail: str
 

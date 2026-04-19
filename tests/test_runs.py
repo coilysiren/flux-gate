@@ -6,11 +6,9 @@ import pytest
 
 from gauntlet import (
     Assertion,
-    Drone,
     Finding,
     HoldoutResult,
     HttpRequest,
-    InMemoryHttpApi,
     IterationRecord,
     IterationSpec,
     Plan,
@@ -26,6 +24,8 @@ from gauntlet.server import (
     record_iteration,
     start_run,
 )
+
+from ._factories import make_execution_result
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -59,7 +59,7 @@ _AUTHZ_PLAN = Plan(
 
 
 def _make_iteration(spec: IterationSpec) -> IterationRecord:
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     return IterationRecord(
         spec=spec,
         plans=[_AUTHZ_PLAN],
@@ -125,7 +125,7 @@ def test_record_iteration_rejects_findings_with_violated_blocker(tmp_path: Path)
 def test_record_holdout_result_round_trip(tmp_path: Path) -> None:
     store = RunStore(tmp_path)
     run_id = store.start_run(["weapon_a"])
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     holdout = HoldoutResult(
         weapon_id="weapon_a",
         blocker_index=0,
@@ -142,7 +142,7 @@ def test_record_holdout_result_round_trip(tmp_path: Path) -> None:
 def test_record_holdout_result_mismatched_weapon_id_raises(tmp_path: Path) -> None:
     store = RunStore(tmp_path)
     run_id = store.start_run(["weapon_a"])
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     holdout = HoldoutResult(weapon_id="weapon_b", execution_result=execution)
     with pytest.raises(ValueError, match="does not match"):
         store.record_holdout_result(run_id, "weapon_a", holdout)
@@ -206,7 +206,7 @@ def test_iteration_buffer_tools_round_trip(tmp_path: Path) -> None:
 def test_holdout_buffer_tools_round_trip(tmp_path: Path) -> None:
     out = start_run(weapon_ids=["weapon_a"], runs_path=str(tmp_path))
     run_id = out["run_id"]
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     holdout = HoldoutResult(weapon_id="weapon_a", execution_result=execution)
 
     record_holdout_result(
@@ -230,7 +230,7 @@ def test_assemble_run_report_buffer_mode(tmp_path: Path) -> None:
         iteration_record=record,
         runs_path=str(tmp_path),
     )
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     record_holdout_result(
         run_id=run_id,
         weapon_id="weapon_a",

@@ -8,9 +8,7 @@ import yaml
 from gauntlet import (
     Assertion,
     DemoWeaponAssessor,
-    Drone,
     HttpRequest,
-    InMemoryHttpApi,
     IterationRecord,
     IterationSpec,
     Plan,
@@ -29,8 +27,10 @@ from gauntlet.server import (
     list_weapons,
 )
 
+from ._factories import make_execution_result
+
 # ---------------------------------------------------------------------------
-# Shared authorization probe reused across several tests.
+# Shared authorization probe used to anchor model shapes across tests.
 # ---------------------------------------------------------------------------
 
 _AUTHZ_PLAN = Plan(
@@ -46,37 +46,15 @@ _AUTHZ_PLAN = Plan(
             user="userB",
             request=HttpRequest(method="PATCH", path="/tasks/{task_id}", body={"completed": True}),
         ),
-        PlanStep(user="userA", request=HttpRequest(method="GET", path="/tasks/{task_id}")),
     ],
     assertions=[
         Assertion(
             name="unauthorized_patch_blocked",
-            kind="status_code",
             expected=403,
             step_index=2,
         ),
-        Assertion(
-            name="task_not_modified_by_other_user",
-            kind="rule",
-            rule="task_not_modified_by_other_user",
-            step_index=3,
-        ),
     ],
 )
-
-
-# ---------------------------------------------------------------------------
-# Drone and assertion evaluation (unchanged deterministic core)
-# ---------------------------------------------------------------------------
-
-
-def test_drone_executes_authz_plan_and_surfaces_flaw() -> None:
-    result = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
-
-    assert result.steps[1].response.status_code == 200  # seeded flaw
-    assert result.assertions[0].passed is False
-    assert result.assertions[1].passed is False
-    assert result.satisfaction_score == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +64,7 @@ def test_drone_executes_authz_plan_and_surfaces_flaw() -> None:
 
 def test_build_risk_report_reflects_holdout_failure() -> None:
     """With zero-satisfaction holdout results and no findings, clearance blocks."""
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(passing=False)
     iteration = IterationRecord(
         spec=build_default_iteration_specs()[0],
         plans=[_AUTHZ_PLAN],
@@ -226,7 +204,7 @@ def test_default_iteration_specs_returns_four_stages() -> None:
 
 
 def test_assemble_run_report_shapes_output() -> None:
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(passing=False)
     iteration = IterationRecord(
         spec=IterationSpec(
             index=1,
@@ -250,56 +228,3 @@ def test_assemble_run_report_shapes_output() -> None:
     assert "clearance" in out
     assert out["clearance"] is not None
     assert out["clearance"]["recommendation"] == "block"
-
-
-# ---------------------------------------------------------------------------
-# Seeded deterministic flaws in the in-memory demo API
-# ---------------------------------------------------------------------------
-
-
-def test_flaw_validation_accepts_invalid_title_type() -> None:
-    api = InMemoryHttpApi()
-    resp = api.send(
-        "userA",
-        HttpRequest(method="POST", path="/tasks", body={"title": 12345}),
-    )
-    assert resp.status_code == 201
-    assert resp.body["title"] == 12345
-    assert not isinstance(resp.body["title"], str)
-
-
-def test_flaw_validation_accepts_missing_title() -> None:
-    api = InMemoryHttpApi()
-    resp = api.send(
-        "userA",
-        HttpRequest(method="POST", path="/tasks", body={}),
-    )
-    assert resp.status_code == 201
-    assert resp.body["title"] == ""
-
-
-def test_flaw_list_endpoint_leaks_across_users() -> None:
-    api = InMemoryHttpApi()
-    api.send("userA", HttpRequest(method="POST", path="/tasks", body={"title": "secret A"}))
-    api.send("userB", HttpRequest(method="POST", path="/tasks", body={"title": "secret B"}))
-
-    resp = api.send("userA", HttpRequest(method="GET", path="/tasks"))
-    assert resp.status_code == 200
-    owners = {t["owner"] for t in resp.body["tasks"]}
-    assert "userB" in owners
-    assert len(resp.body["tasks"]) == 2
-
-
-def test_flaw_patch_without_ownership_check() -> None:
-    api = InMemoryHttpApi()
-    resp = api.send(
-        "userA",
-        HttpRequest(method="POST", path="/tasks", body={"title": "owned by A"}),
-    )
-    task_id = resp.body["id"]
-    patch_resp = api.send(
-        "userB",
-        HttpRequest(method="PATCH", path=f"/tasks/{task_id}", body={"title": "hijacked"}),
-    )
-    assert patch_resp.status_code == 200
-    assert patch_resp.body["last_modified_by"] == "userB"

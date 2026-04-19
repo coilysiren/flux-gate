@@ -1,4 +1,4 @@
-from .adapters import Adapter, CliAdapter, HttpApi, InMemoryHttpApi, WebDriverAdapter
+from .adapters import Adapter, HttpApi
 from .auth import ApiKeyAuth, BearerAuth, UsersConfig, to_user_headers
 from .executor import Drone
 from .loop import aggregate_final_clearance, build_default_iteration_specs, build_risk_report
@@ -41,7 +41,6 @@ __all__ = [
     "Assertion",
     "AssertionResult",
     "BearerAuth",
-    "CliAdapter",
     "Clearance",
     "DemoWeaponAssessor",
     "Drone",
@@ -55,7 +54,6 @@ __all__ = [
     "HttpApi",
     "HttpRequest",
     "HttpResponse",
-    "InMemoryHttpApi",
     "IterationRecord",
     "IterationSpec",
     "Observation",
@@ -71,7 +69,6 @@ __all__ = [
     "WeaponAssessor",
     "WeaponBrief",
     "WeaponReport",
-    "WebDriverAdapter",
     "aggregate_final_clearance",
     "build_default_iteration_specs",
     "build_risk_report",

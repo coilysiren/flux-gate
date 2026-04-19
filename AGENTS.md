@@ -61,6 +61,6 @@ After any code change:
 
 1. Run `docker compose run --rm test` — all tests must pass
 2. Run `uv run ruff check . && uv run ruff format --check .` — no lint or format errors
-3. Run `uv run mypy gauntlet tests demo_api --strict` — no type errors
+3. Run `uv run mypy gauntlet tests --strict` — no type errors
 
 Pre-commit enforces rules 2 and 3 automatically on `git commit`.

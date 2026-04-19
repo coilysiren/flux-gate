@@ -3,27 +3,13 @@ from __future__ import annotations
 from typing import Protocol
 
 from ..models import Action, HttpRequest, HttpResponse, Observation
-from .cli import CliAdapter
-from .http import HttpApi, InMemoryHttpApi
-from .webdriver import WebDriverAdapter
+from .http import HttpApi
 
-__all__ = [
-    "Adapter",
-    "CliAdapter",
-    "HttpApi",
-    "InMemoryHttpApi",
-    "WebDriverAdapter",
-]
+__all__ = ["Adapter", "HttpApi"]
 
 
 class Adapter(Protocol):
-    """Executes an action against the system under test and returns an observation.
-
-    Adapters bridge the generalized Action/Observation layer to a concrete
-    execution surface (HTTP, CLI, WebDriver, etc.).  The ``send`` method is
-    the HTTP-specific shorthand; ``execute`` is the surface-agnostic entry
-    point that the Drone prefers.
-    """
+    """Executes an action against the system under test and returns an observation."""
 
     def send(self, user: str, request: HttpRequest) -> HttpResponse: ...
 

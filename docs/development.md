@@ -54,20 +54,6 @@ Files the plugin system reads:
 
 Both paths are load-bearing. Moving either breaks the plugin; update `plugin.json` if you relocate a file.
 
-## Running the demo API
-
-```bash
-uv run python demo_api/server.py
-```
-
-Starts the demo API on `http://localhost:8000`. It has three seeded flaws that the weapons in `.gauntlet/weapons/` should surface:
-
-1. **PATCH without ownership check** - any user can modify any task
-2. **POST accepts invalid/missing title** - no input validation
-3. **GET /tasks leaks all users' data** - no read isolation
-
-Point Gauntlet at `http://localhost:8000` from a Claude Code session to exercise the full loop end-to-end.
-
 ## Tests
 
 ```bash
@@ -91,7 +77,7 @@ Pre-commit hooks run automatically on every `git commit`. To run manually:
 uv run ruff check .          # lint
 uv run ruff check . --fix    # lint + auto-fix
 uv run ruff format .         # format
-uv run mypy gauntlet tests demo_api --strict  # type-check
+uv run mypy gauntlet tests --strict  # type-check
 ```
 
 ## CI

@@ -6,10 +6,8 @@ import pytest
 
 from gauntlet import (
     Clearance,
-    Drone,
     HoldoutResult,
     HttpRequest,
-    InMemoryHttpApi,
     IterationRecord,
     Plan,
     PlanStep,
@@ -25,6 +23,8 @@ from gauntlet.server import (
     record_iteration,
     start_run,
 )
+
+from ._factories import make_execution_result
 
 # ---------------------------------------------------------------------------
 # Direct aggregator (loop-level)
@@ -172,7 +172,7 @@ _AUTHZ_PLAN = Plan(
 
 
 def _seed_weapon(store: RunStore, run_id: str, weapon_id: str) -> None:
-    execution = Drone(InMemoryHttpApi()).run_plan(_AUTHZ_PLAN)
+    execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     record = IterationRecord(
         spec=build_default_iteration_specs()[0],
         plans=[_AUTHZ_PLAN],

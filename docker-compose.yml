@@ -1,13 +1,4 @@
 services:
-  api:
-    build: .
-    command: uv run python demo_api/server.py
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
-
   test:
     build: .
     command: uv run pytest -m "not docker"
