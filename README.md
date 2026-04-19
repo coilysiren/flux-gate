@@ -23,6 +23,17 @@ claude mcp add gauntlet -- uv run gauntlet-mcp
 
 Once registered, Claude Code will expose the `gauntlet` MCP server to any session in that project. Confirm it is discovered with `/mcp` inside Claude Code.
 
+### Install the host skill
+
+The MCP server exposes tools; the [host skill](skills/gauntlet/SKILL.md) tells the host agent how to drive them - the role discipline, the iteration ladder, the plan and finding shapes, and the train/test split rules. Copy it into your project's Claude Code skills directory:
+
+```bash
+mkdir -p .claude/skills/gauntlet
+cp path/to/gauntlet/skills/gauntlet/SKILL.md .claude/skills/gauntlet/SKILL.md
+```
+
+With the skill installed, any session in that project can invoke Gauntlet by naming it ("run gauntlet against http://localhost:8000", "adversarially test this API before I merge"). Without the skill, the host has to re-derive the loop each time and is far more likely to collapse the train/test split.
+
 ## MCP tools
 
 | Tool | Purpose | Use in host role |
@@ -187,28 +198,32 @@ It combines:
 
 ## Prior Art
 
-These projects occupy the same space - adversarial testing of running services.
+These projects occupy the same space - adversarial testing of running services. Gauntlet's distinguishing axis is architectural: the reasoning (plan generation, result analysis) lives in a host Claude Code agent driven by a packaged Skill, while execution and report assembly live in an MCP server. The agent never sees the `blockers`; the MCP server never reasons. That separation is what preserves the train/test split against agent-authored code.
 
 ### [RESTler](https://github.com/microsoft/restler-fuzzer)
 
 Stateful REST API fuzzer from Microsoft Research. RESTler generates and executes sequences of HTTP requests against a live service, inferring producer-consumer dependencies between endpoints from the OpenAPI spec to explore deep service states.
 
-Shared ground: attacks a **running HTTP server** with **multi-step request sequences**, finds bugs that only manifest through specific request orderings, and checks for both security and reliability failures.
+Shared ground: attacks a **running HTTP server** with **multi-step request sequences**, finds bugs that only manifest through specific request orderings, targets both security and reliability failures.
 
-Architectural divergence: RESTler uses grammar-based fuzzing derived from the OpenAPI spec, not LLM reasoning. Validation is hardcoded checkers (status codes, schema conformance), not an Inspector that reasons about what looks suspicious. There is no train/test split - all validation rules are visible to the generation logic. Output is boolean pass/fail per sequence, not a probabilistic confidence score.
+Architectural divergence: RESTler is a self-contained process - grammar-based generation from the OpenAPI spec, hardcoded validators (status codes, schema conformance), no separation between generator and checker. Gauntlet splits reasoning out into a host agent (which reads the weapon description and invents plans) and keeps execution + report assembly in a deterministic MCP server; there is no internal grammar. RESTler has no train/test split because it has no second reasoning party to withhold invariants from. Output is pass/fail per sequence, not a risk report with a clearance gate.
 
 ### [Schemathesis](https://github.com/schemathesis/schemathesis)
 
 Property-based API testing built on the Hypothesis framework. Generates thousands of test cases from OpenAPI/GraphQL schemas and executes them against a live API to find crashes, schema violations, and stateful workflow bugs.
 
-Shared ground: tests a **live running API**, supports **stateful multi-step workflows** where earlier requests create resources consumed by later ones, and is deliberately **adversarial** - generating edge cases, boundary conditions, and invalid inputs to break the API.
+Shared ground: tests a **live running API**, supports **stateful multi-step workflows** where earlier requests create resources consumed by later ones, is deliberately **adversarial**.
 
-Architectural divergence: generation is algorithmic (property-based testing), not LLM-driven. There is no Attacker/Inspector separation - generation and validation are unified. No hidden blockers or train/test split. Results are deterministic pass/fail, not probabilistic confidence.
+Architectural divergence: Schemathesis is algorithmic (property-based testing from schema); Gauntlet is agent-driven (plans composed by a host LLM reasoning about a weapon description). The two are complementary - Schemathesis exhausts the schema space, Gauntlet targets specific invariants under adversarial pressure. Schemathesis has no Attacker/Inspector separation, no hidden blockers, no agent to withhold anything from; results are deterministic pass/fail, not a confidence-scored risk report.
 
 ### [ToolFuzz](https://github.com/eth-sri/ToolFuzz)
 
 LLM-powered fuzzer from ETH Zurich that generates natural-language test prompts and executes them against LLM agent tools, detecting both runtime crashes and semantic correctness failures.
 
-Shared ground: **uses LLMs to generate adversarial inputs** and has **separate generation and evaluation phases** - prompts are generated, executed against the target, and then an LLM judges whether outputs are semantically correct. This is the closest architectural parallel to the host's Attacker/Inspector roles plus Gauntlet's deterministic execution layer.
+Shared ground: **uses LLMs to generate adversarial inputs**, has **separate generation and evaluation phases**. Conceptually the closest parallel to Gauntlet's Attacker/Inspector split.
 
-Architectural divergence: targets LLM agent tools (LangChain, Composio) rather than arbitrary HTTP APIs. No hidden blockers or train/test split - the evaluator sees all context. Attacks are individual prompts, not multi-step chained API call sequences. No probabilistic confidence scoring.
+Architectural divergence: ToolFuzz runs its own LLM client end-to-end (its own credentials, its own reasoning), targets LLM agent tools (LangChain, Composio), and has no train/test split - its evaluator sees all the context its generator used. Gauntlet inverts all three: reasoning is delegated to the host Claude Code agent (Gauntlet holds no credentials), the target is an arbitrary HTTP API, and the host-side Skill enforces strict separation between the Attacker context (weapon description only) and the HoldoutEvaluator context (blockers). Gauntlet attacks are multi-step chained API sequences bound by per-weapon hidden invariants; ToolFuzz attacks are single prompts judged semantically.
+
+### Where Gauntlet sits
+
+The closest comparison - ToolFuzz - is a self-contained LLM-driven fuzzer for agent tools. Gauntlet is the same idea pushed one layer further: instead of bundling its own LLM, it ships as an MCP server + Skill that a Claude Code host drives. This is the right shape for the dark-factory use case, where the host is already running and already has credentials; it also makes the train/test split a host-side prompt discipline rather than a compile-time check, which is the honest framing given that all three parties (Attacker, Inspector, HoldoutEvaluator) are contexts inside one agent.
