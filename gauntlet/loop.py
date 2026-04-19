@@ -1,14 +1,20 @@
 from __future__ import annotations
 
-from typing import Literal
+import statistics
+from collections import defaultdict
+from typing import Any, Literal
 
 from .models import (
     Clearance,
     ExecutionResult,
+    ExecutionStepResult,
+    FailureCluster,
     FinalClearance,
     Finding,
     IterationRecord,
+    ResponseCollision,
     RiskReport,
+    TimingAnomaly,
     WeaponReport,
 )
 
@@ -47,6 +53,11 @@ def build_risk_report(
 
     clearance = _build_clearance(holdout_results, clearance_threshold) if holdout_results else None
 
+    failure_clusters = _cluster_failures(blocker_findings)
+    coverage_gaps = _coverage_gaps(records)
+    response_collisions = _response_collisions(records)
+    timing_anomalies = _timing_anomalies(records)
+
     report = RiskReport(
         confidence_score=confidence_score,
         risk_level=risk_level,
@@ -57,6 +68,10 @@ def build_risk_report(
         anomalies=anomalies,
         coverage=coverage,
         conclusion=_conclusion(risk_level, confirmed_failures),
+        failure_clusters=failure_clusters,
+        coverage_gaps=coverage_gaps,
+        response_collisions=response_collisions,
+        timing_anomalies=timing_anomalies,
     )
     return report, clearance
 
@@ -222,3 +237,212 @@ def _conclusion(risk_level: str, confirmed_failures: list[str]) -> str:
             "without remediation."
         )
     return f"System survived the current adversarial loop with {risk_level} risk."
+
+
+# ---------------------------------------------------------------------------
+# Risk-report deterministic intelligence
+# ---------------------------------------------------------------------------
+
+
+def _cluster_failures(blocker_findings: list[Finding]) -> list[FailureCluster]:
+    """Group blocker findings by ``(endpoint, method, severity)``.
+
+    The endpoint/method pair is derived from the finding's first ``trace``
+    step. If the finding has no traces we fall back to ``"unknown"`` so the
+    cluster key is still stable. The representative finding is the one with
+    the highest ``confidence`` in the group; ties break on first-seen order.
+    """
+    clusters: dict[tuple[str, str, str], list[Finding]] = defaultdict(list)
+    for finding in blocker_findings:
+        endpoint: str
+        method: str
+        if finding.traces:
+            first = finding.traces[0]
+            endpoint = first.request.path
+            method = first.request.method
+        else:
+            endpoint = "unknown"
+            method = "unknown"
+        clusters[(endpoint, method, finding.severity)].append(finding)
+
+    out: list[FailureCluster] = []
+    for (endpoint, method, severity), group in clusters.items():
+        representative = max(group, key=lambda f: f.confidence)
+        out.append(
+            FailureCluster(
+                endpoint=endpoint,
+                method=method,
+                severity=severity,  # type: ignore[arg-type]
+                size=len(group),
+                representative_issue=representative.issue,
+            )
+        )
+    # Deterministic ordering: highest severity first, then largest cluster,
+    # then endpoint alphabetically for stability.
+    severity_rank = {"high": 0, "medium": 1, "low": 2}
+    out.sort(key=lambda c: (severity_rank[c.severity], -c.size, c.endpoint, c.method))
+    return out
+
+
+_GAP_SEVERITY_ORDER: dict[str, int] = {
+    "missing 5xx": 0,
+    "missing 4xx": 1,
+    "missing 3xx": 2,
+    "missing 2xx": 3,
+}
+
+
+def _coverage_gaps(records: list[IterationRecord]) -> list[str]:
+    """Report status-code buckets that were never observed.
+
+    Buckets are 2xx/3xx/4xx/5xx. If no steps ran, returns ``[]``. Order is
+    severity-first: 5xx > 4xx > 3xx > 2xx, matching how a host would
+    prioritize plugging gaps.
+    """
+    observed_buckets: set[str] = set()
+    for record in records:
+        for result in record.execution_results:
+            for step in result.steps:
+                bucket = _status_bucket(step.response.status_code)
+                if bucket is not None:
+                    observed_buckets.add(bucket)
+
+    if not observed_buckets:
+        return []
+
+    all_buckets = {"2xx", "3xx", "4xx", "5xx"}
+    missing = [f"missing {b}" for b in all_buckets - observed_buckets]
+    missing.sort(key=lambda m: _GAP_SEVERITY_ORDER[m])
+    return missing
+
+
+def _status_bucket(status_code: int) -> str | None:
+    if 200 <= status_code < 300:
+        return "2xx"
+    if 300 <= status_code < 400:
+        return "3xx"
+    if 400 <= status_code < 500:
+        return "4xx"
+    if 500 <= status_code < 600:
+        return "5xx"
+    return None
+
+
+def _response_collisions(records: list[IterationRecord]) -> list[ResponseCollision]:
+    """Find response fingerprints shared by >= 3 steps across >= 2 plans.
+
+    Fingerprint: ``(status, body_shape, size_bucket)`` — see
+    ``_body_schema_shape`` and ``_response_size_bucket`` for bucket shapes.
+    """
+    per_fingerprint_steps: dict[str, int] = defaultdict(int)
+    per_fingerprint_plans: dict[str, set[str]] = defaultdict(set)
+
+    for record in records:
+        for result in record.execution_results:
+            for step in result.steps:
+                fingerprint = _response_fingerprint(step)
+                per_fingerprint_steps[fingerprint] += 1
+                per_fingerprint_plans[fingerprint].add(result.plan_name)
+
+    out: list[ResponseCollision] = []
+    for fingerprint, count in per_fingerprint_steps.items():
+        distinct_plans = len(per_fingerprint_plans[fingerprint])
+        if count >= 3 and distinct_plans >= 2:
+            out.append(
+                ResponseCollision(
+                    fingerprint=fingerprint,
+                    occurrences=count,
+                    distinct_plans=distinct_plans,
+                )
+            )
+    out.sort(key=lambda c: (-c.occurrences, -c.distinct_plans, c.fingerprint))
+    return out
+
+
+def _response_fingerprint(step: ExecutionStepResult) -> str:
+    status = step.response.status_code
+    shape = _body_schema_shape(step.response.body)
+    size_bucket = _response_size_bucket(step.response.body)
+    return f"status={status}|{shape}|size={size_bucket}"
+
+
+def _body_schema_shape(body: Any) -> str:
+    if not isinstance(body, dict):
+        return "scalar"
+    if not body:
+        return "empty"
+    keys = sorted(str(k) for k in body.keys())
+    return "keys=" + ",".join(keys)
+
+
+_SIZE_BUCKETS: list[tuple[int, str]] = [
+    (0, "0"),
+    (256, "1-256"),
+    (1024, "257-1k"),
+    (4096, "1k-4k"),
+    (16384, "4k-16k"),
+]
+
+
+def _response_size_bucket(body: Any) -> str:
+    # A stable, cheap estimate: len of the repr. We do not re-serialize to
+    # JSON here because that would couple coarse bucketing to serializer
+    # behavior, and the buckets are coarse enough that any consistent
+    # measure is fine.
+    try:
+        size = len(repr(body)) if body else 0
+    except Exception:
+        size = 0
+    for threshold, label in _SIZE_BUCKETS:
+        if size <= threshold:
+            return label
+    return "16k+"
+
+
+def _timing_anomalies(records: list[IterationRecord]) -> list[TimingAnomaly]:
+    """Flag steps with duration >= 10x the median for their ``(method, path)``.
+
+    Gated on the step carrying a ``duration_ms`` attribute; if the richer
+    ``ExecutionStepResult`` hasn't landed yet, returns ``[]``. The median
+    needs at least 3 samples before anomalies are reported.
+    """
+    by_endpoint: dict[tuple[str, str], list[float]] = defaultdict(list)
+    all_steps: list[tuple[str, str, float]] = []
+
+    for record in records:
+        for result in record.execution_results:
+            for step in result.steps:
+                duration = getattr(step, "duration_ms", None)
+                if duration is None:
+                    continue
+                try:
+                    duration_f = float(duration)
+                except (TypeError, ValueError):
+                    continue
+                method_str: str = step.request.method
+                path_str: str = step.request.path
+                key = (method_str, path_str)
+                by_endpoint[key].append(duration_f)
+                all_steps.append((method_str, path_str, duration_f))
+
+    out: list[TimingAnomaly] = []
+    medians: dict[tuple[str, str], float] = {}
+    for key, samples in by_endpoint.items():
+        if len(samples) >= 3:
+            medians[key] = statistics.median(samples)
+
+    for method, path, duration in all_steps:
+        median = medians.get((method, path))
+        if median is None or median <= 0:
+            continue
+        if duration >= 10 * median:
+            out.append(
+                TimingAnomaly(
+                    method=method,
+                    path=path,
+                    duration_ms=duration,
+                    endpoint_median_ms=median,
+                )
+            )
+    out.sort(key=lambda a: (-a.duration_ms, a.method, a.path))
+    return out

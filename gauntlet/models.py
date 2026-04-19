@@ -208,6 +208,48 @@ class Clearance(GauntletModel):
     rationale: str
 
 
+class FailureCluster(GauntletModel):
+    """A group of blocker findings sharing ``(endpoint, method, severity)``.
+
+    Emitted by ``build_risk_report`` so the host can prioritize: 8 findings
+    on the same endpoint are 1 issue, not 8. ``representative_issue`` is the
+    ``issue`` text of the highest-confidence finding in the cluster.
+    """
+
+    endpoint: str
+    method: str
+    severity: Literal["low", "medium", "high"]
+    size: int
+    representative_issue: str
+
+
+class ResponseCollision(GauntletModel):
+    """Identical response fingerprint observed across multiple distinct plans.
+
+    Two distinct attack patterns producing identical responses is signal —
+    either both miss the same gap, or there is a common vulnerable code
+    path. ``fingerprint`` is a stable string of ``(status, body shape, size
+    bucket)``.
+    """
+
+    fingerprint: str
+    occurrences: int
+    distinct_plans: int
+
+
+class TimingAnomaly(GauntletModel):
+    """A single step whose duration is >= 10x the endpoint median.
+
+    Populated only when ``ExecutionStepResult`` carries ``duration_ms`` and
+    the endpoint has at least three timing samples.
+    """
+
+    method: str
+    path: str
+    duration_ms: float
+    endpoint_median_ms: float
+
+
 class RiskReport(GauntletModel):
     confidence_score: float = Field(ge=0.0, le=1.0)
     risk_level: Literal["low", "medium", "high"]
@@ -218,6 +260,10 @@ class RiskReport(GauntletModel):
     anomalies: list[str] = Field(default_factory=list)
     coverage: list[str]
     conclusion: str
+    failure_clusters: list[FailureCluster] = Field(default_factory=list)
+    coverage_gaps: list[str] = Field(default_factory=list)
+    response_collisions: list[ResponseCollision] = Field(default_factory=list)
+    timing_anomalies: list[TimingAnomaly] = Field(default_factory=list)
 
 
 class WeaponReport(GauntletModel):
