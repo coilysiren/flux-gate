@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 from mcp.server.fastmcp import FastMCP
 
+from ._log import configure_logging, log_tool_call
 from .executor import Drone
 from .http import HttpApi
 from .loop import aggregate_final_clearance, build_risk_report
@@ -34,6 +35,8 @@ from .models import (
     WeaponReport,
 )
 from .runs import RunStore
+
+configure_logging()
 
 mcp = FastMCP("gauntlet")
 
@@ -64,7 +67,8 @@ def list_weapons(weapons_path: str = _DEFAULT_WEAPONS_PATH) -> list[dict[str, st
     Each entry is ``{id, title, description}`` — ``blockers`` are intentionally
     omitted. Call this in the host's Attacker context to pick a weapon.
     """
-    return [w.attacker_view() for w in _load_weapons(weapons_path)]
+    with log_tool_call("list_weapons", weapons_path=weapons_path):
+        return [w.attacker_view() for w in _load_weapons(weapons_path)]
 
 
 @mcp.tool()
@@ -75,10 +79,11 @@ def get_weapon(weapon_id: str, weapons_path: str = _DEFAULT_WEAPONS_PATH) -> Wea
     the result in an Attacker context — doing so collapses the train/test
     split and invalidates the run.
     """
-    for weapon in _load_weapons(weapons_path):
-        if weapon.id == weapon_id:
-            return weapon
-    raise ValueError(f"No weapon with id {weapon_id!r}")
+    with log_tool_call("get_weapon", weapon_id=weapon_id, weapons_path=weapons_path):
+        for weapon in _load_weapons(weapons_path):
+            if weapon.id == weapon_id:
+                return weapon
+        raise ValueError(f"No weapon with id {weapon_id!r}")
 
 
 @mcp.tool()
@@ -94,8 +99,9 @@ def execute_plan(
     ``{"alice": {"Authorization": "Bearer ..."}}``). Users without an entry
     fall back to the default ``X-User: <name>`` header.
     """
-    drone = Drone(HttpApi(url, user_headers=user_headers or {}))
-    return drone.run_plan(plan)
+    with log_tool_call("execute_plan", url=url, plan_name=plan.name):
+        drone = Drone(HttpApi(url, user_headers=user_headers or {}))
+        return drone.run_plan(plan)
 
 
 @mcp.tool()
@@ -110,14 +116,17 @@ def assemble_run_report(
     the report. Returns ``risk_report`` plus a clearance recommendation
     (``pass``, ``conditional``, or ``block``).
     """
-    records = _run_store.read_iteration_records(run_id, weapon_id)
-    holdouts = [hr.execution_result for hr in _run_store.read_holdout_results(run_id, weapon_id)]
+    with log_tool_call("assemble_run_report", run_id=run_id, weapon_id=weapon_id):
+        records = _run_store.read_iteration_records(run_id, weapon_id)
+        holdouts = [
+            hr.execution_result for hr in _run_store.read_holdout_results(run_id, weapon_id)
+        ]
 
-    report, clearance = build_risk_report(records, holdouts, clearance_threshold)
-    return {
-        "risk_report": report.model_dump(),
-        "clearance": clearance.model_dump() if clearance else None,
-    }
+        report, clearance = build_risk_report(records, holdouts, clearance_threshold)
+        return {
+            "risk_report": report.model_dump(),
+            "clearance": clearance.model_dump() if clearance else None,
+        }
 
 
 @mcp.tool()
@@ -129,7 +138,8 @@ def start_run(weapon_ids: list[str]) -> dict[str, str]:
     ``read_holdout_results``, and ``assemble_run_report`` calls. The buffer
     is short-lived: one run, one host session.
     """
-    return {"run_id": _run_store.start_run(weapon_ids)}
+    with log_tool_call("start_run", weapon_count=len(weapon_ids)):
+        return {"run_id": _run_store.start_run(weapon_ids)}
 
 
 @mcp.tool()
@@ -146,8 +156,9 @@ def record_iteration(
     blocker text, and the train/test split forbids it from entering this
     buffer.
     """
-    _run_store.record_iteration(run_id, weapon_id, iteration_record)
-    return {"status": "ok"}
+    with log_tool_call("record_iteration", run_id=run_id, weapon_id=weapon_id):
+        _run_store.record_iteration(run_id, weapon_id, iteration_record)
+        return {"status": "ok"}
 
 
 @mcp.tool()
@@ -158,7 +169,8 @@ def read_iteration_records(run_id: str, weapon_id: str) -> list[IterationRecord]
     and by the Inspector (to read prior findings). Both reads are train/test
     safe: nothing returned here ever contains blocker text.
     """
-    return _run_store.read_iteration_records(run_id, weapon_id)
+    with log_tool_call("read_iteration_records", run_id=run_id, weapon_id=weapon_id):
+        return _run_store.read_iteration_records(run_id, weapon_id)
 
 
 @mcp.tool()
@@ -173,8 +185,9 @@ def record_holdout_result(
     derived from a weapon's blocker. ``HoldoutResult.weapon_id`` must match
     the ``weapon_id`` argument.
     """
-    _run_store.record_holdout_result(run_id, weapon_id, holdout_result)
-    return {"status": "ok"}
+    with log_tool_call("record_holdout_result", run_id=run_id, weapon_id=weapon_id):
+        _run_store.record_holdout_result(run_id, weapon_id, holdout_result)
+        return {"status": "ok"}
 
 
 @mcp.tool()
@@ -185,7 +198,8 @@ def read_holdout_results(run_id: str, weapon_id: str) -> list[HoldoutResult]:
     from the Attacker or Inspector role — holdout outcomes carry blocker
     semantics and reading them collapses the train/test split.
     """
-    return _run_store.read_holdout_results(run_id, weapon_id)
+    with log_tool_call("read_holdout_results", run_id=run_id, weapon_id=weapon_id):
+        return _run_store.read_holdout_results(run_id, weapon_id)
 
 
 @mcp.tool()
@@ -214,16 +228,17 @@ def assemble_final_clearance(
     contexts must not see per-weapon reports — they carry confirmed-failure
     text that paraphrases blocker semantics.
     """
-    weapons = list(weapon_ids) if weapon_ids is not None else _run_store.list_weapon_ids(run_id)
+    with log_tool_call("assemble_final_clearance", run_id=run_id):
+        weapons = list(weapon_ids) if weapon_ids is not None else _run_store.list_weapon_ids(run_id)
 
-    per_weapon: list[WeaponReport] = []
-    for wid in weapons:
-        records = _run_store.read_iteration_records(run_id, wid)
-        holdouts = [hr.execution_result for hr in _run_store.read_holdout_results(run_id, wid)]
-        report, clearance = build_risk_report(records, holdouts, clearance_threshold)
-        per_weapon.append(WeaponReport(weapon_id=wid, risk_report=report, clearance=clearance))
+        per_weapon: list[WeaponReport] = []
+        for wid in weapons:
+            records = _run_store.read_iteration_records(run_id, wid)
+            holdouts = [hr.execution_result for hr in _run_store.read_holdout_results(run_id, wid)]
+            report, clearance = build_risk_report(records, holdouts, clearance_threshold)
+            per_weapon.append(WeaponReport(weapon_id=wid, risk_report=report, clearance=clearance))
 
-    return aggregate_final_clearance(per_weapon, clearance_threshold)
+        return aggregate_final_clearance(per_weapon, clearance_threshold)
 
 
 __all__ = [

@@ -17,6 +17,7 @@ gauntlet/
 ├── executor.py  # Drone - runs plans by calling HttpApi.send per step
 ├── loop.py      # build_risk_report + aggregate_final_clearance helpers
 ├── runs.py      # RunStore - per-run iteration + holdout buffer (filesystem)
+├── _log.py      # Private. JSON stderr logging + log_tool_call contextmgr
 └── server.py    # FastMCP server exposing the gauntlet tools
 ```
 
@@ -27,7 +28,7 @@ models  ←  http
 models  ←  runs
 models + http  ←  executor
 models  ←  loop
-models + executor + loop + http + runs  ←  server
+_log + models + executor + loop + http + runs  ←  server
 ```
 
 Nothing imports from `server.py`. The MCP entry point (`main()` in `server.py`) runs `FastMCP.run()` which speaks stdio to the Claude Code process that launched it.
