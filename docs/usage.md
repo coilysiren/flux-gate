@@ -4,9 +4,9 @@ Workflow guide for a host Claude Code agent driving the Gauntlet MCP server. For
 
 ## Prerequisites
 
-- Gauntlet installed and registered as an MCP server in the Claude Code project. See [README - Install and register](../README.md#install-and-register).
+- Gauntlet installed and registered as an MCP server in the Claude Code project. See [README - Install](../README.md#install).
 - A running SUT (URL the host can reach).
-- A `.gauntlet/` directory at the project root with at least one weapon and one target.
+- A `.gauntlet/` directory at the project root with at least one weapon YAML.
 
 No Anthropic or OpenAI credentials are needed. Gauntlet never calls an LLM itself; the host already has auth.
 
@@ -18,24 +18,25 @@ Place the invocation as the final checkpoint in the host's pipeline.
 
 ## The host-driven loop
 
-Gauntlet exposes seven MCP tools. The host drives them in roughly this order:
+Gauntlet exposes 13 MCP tools (see the [README](../README.md#mcp-tools) for the full table). The host drives them in roughly this order:
 
-1. **Orchestrator**: pick a weapon and target.
+1. **Orchestrator**: pick weapons, start the run.
    ```
-   list_weapons()         → list[dict]   # {id, title, description}
+   list_weapons()                 → list[dict]   # {id, title, description}
+   start_run(weapon_ids=[...])    → {run_id}
    ```
 
-2. **Per iteration** (typically four - baseline → boundary → adversarial_misuse → targeted_escalation):
+2. **Per iteration** (typically four - baseline → boundary → adversarial_misuse → targeted_escalation), with per-role subagents appending to the run buffer via `record_iteration` / `read_iteration_records`:
    - **Attacker context** (reads the attacker view of the weapon — `{id, title, description}` only): compose one or more `Plan`s targeting the weapon's surface, drawing on prior iteration results.
    - **Drone** (via MCP): `execute_plan(url, plan, user_headers)` → `ExecutionResult`. Repeat per plan.
    - **Inspector context** (reads `ExecutionResult`s, not blockers): produce `Finding`s. Optionally mark some as `is_anomaly=True`.
    - Append an `IterationRecord` bundling the spec, plans, results, and findings.
 
-3. **HoldoutEvaluator context** (reads full `Weapon` including `blockers`):
+3. **HoldoutEvaluator context** (reads full `Weapon` including `blockers`, appends via `record_holdout_result`):
    ```
    get_weapon(id) → Weapon
    ```
-   Derive acceptance plans from each blocker - one structured `Plan` per blocker. Execute each with `execute_plan`. Collect the `ExecutionResult` list as `holdout_results`.
+   Derive acceptance plans from each blocker - one structured `Plan` per blocker. Execute each with `execute_plan` and record the outcome.
 
 4. **Orchestrator**:
    ```
@@ -44,6 +45,8 @@ Gauntlet exposes seven MCP tools. The host drives them in roughly this order:
    assemble_final_clearance(run_id, clearance_threshold=0.9)
    → FinalClearance
    ```
+
+Optional Orchestrator-side tools round out the loop: `mutate_plans` (deterministic plan variants between iterations), `replay_finding` (re-execute a stored finding's `ReplayBundle` — useful for "did the fix work" loops), and `recurring_failures` (cross-run issues that have repeated in the last N runs).
 
 The train/test split is enforced at the permission layer via the per-role subagents' MCP-tool allowlists, plus at the buffer boundary by `record_iteration` (which rejects findings carrying blocker text).
 

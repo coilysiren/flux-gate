@@ -39,7 +39,8 @@ This loads the plugin from disk for the current session - no install, no cache. 
 - auto-discover the skill at `skills/gauntlet/SKILL.md`
 
 Verify:
-- `/mcp` lists `gauntlet` with its 7 tools
+- `/mcp` lists `gauntlet` with its 13 tools
+- `/agents` lists `gauntlet-attacker`, `gauntlet-inspector`, `gauntlet-holdout-evaluator`
 - Typing a trigger phrase like "run gauntlet" loads the skill
 
 To install the plugin permanently (for non-development use):
@@ -50,9 +51,11 @@ claude plugin install /absolute/path/to/gauntlet
 
 Files the plugin system reads:
 - `.claude-plugin/plugin.json` - manifest (MCP server declaration, metadata)
-- `skills/gauntlet/SKILL.md` - auto-discovered skill
+- `skills/gauntlet/SKILL.md` - the Orchestrator skill (auto-discovered by trigger phrase)
+- `skills/gauntlet-author/SKILL.md` - the weapon-authoring skill (auto-discovered by trigger phrase)
+- `agents/gauntlet-attacker.md`, `agents/gauntlet-inspector.md`, `agents/gauntlet-holdout-evaluator.md` - per-role subagent definitions with MCP-tool allowlists
 
-Both paths are load-bearing. Moving either breaks the plugin; update `plugin.json` if you relocate a file.
+All paths are load-bearing. Moving any of them breaks the plugin; update `plugin.json` if you relocate a file.
 
 ## Tests
 
