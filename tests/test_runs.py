@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -15,6 +17,7 @@ from gauntlet import (
     PlanStep,
     RunStore,
 )
+from gauntlet.runs import SCHEMA_VERSION
 from gauntlet.server import (
     assemble_run_report,
     read_holdout_results,
@@ -237,3 +240,115 @@ def test_assemble_run_report_buffer_mode(tmp_path: Path, monkeypatch: pytest.Mon
     )
     assert out["clearance"] is not None
     assert out["clearance"]["recommendation"] == "block"
+
+
+# ---------------------------------------------------------------------------
+# Buffer robustness: corrupt-line tolerance, schema_version, flock concurrency
+# ---------------------------------------------------------------------------
+
+
+def test_manifest_includes_schema_version(tmp_path: Path) -> None:
+    store = RunStore(tmp_path)
+    run_id = store.start_run(["weapon_a"])
+    manifest = json.loads((tmp_path / run_id / "manifest.json").read_text())
+    assert manifest["schema_version"] == SCHEMA_VERSION
+
+
+def test_list_weapon_ids_tolerates_missing_schema_version(tmp_path: Path) -> None:
+    store = RunStore(tmp_path)
+    run_id = store.start_run(["weapon_a"])
+    # Simulate a buffer written before schema_version was introduced.
+    manifest_path = tmp_path / run_id / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    del manifest["schema_version"]
+    manifest_path.write_text(json.dumps(manifest))
+    assert store.list_weapon_ids(run_id) == ["weapon_a"]
+
+
+def test_read_iteration_records_skips_corrupt_lines(tmp_path: Path) -> None:
+    store = RunStore(tmp_path)
+    run_id = store.start_run(["weapon_a"])
+    good = _make_iteration(_spec())
+    store.record_iteration(run_id, "weapon_a", good)
+
+    # Append a corrupt line directly to the JSONL file.
+    iterations_path = tmp_path / run_id / "weapon_a" / "iterations.jsonl"
+    with iterations_path.open("a") as fh:
+        fh.write("{this is not valid json\n")
+
+    # And a structurally valid JSON line that fails schema validation.
+    with iterations_path.open("a") as fh:
+        fh.write(json.dumps({"unexpected": "shape"}) + "\n")
+
+    records = store.read_iteration_records(run_id, "weapon_a")
+    assert len(records) == 1
+    assert records[0].plans[0].name == _AUTHZ_PLAN.name
+
+    counts = store.corrupt_record_counts()
+    assert counts[(run_id, "weapon_a")] == 2
+
+
+def test_read_holdout_results_skips_corrupt_lines(tmp_path: Path) -> None:
+    store = RunStore(tmp_path)
+    run_id = store.start_run(["weapon_a"])
+    execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
+    store.record_holdout_result(
+        run_id,
+        "weapon_a",
+        HoldoutResult(weapon_id="weapon_a", execution_result=execution),
+    )
+
+    holdouts_path = tmp_path / run_id / "weapon_a" / "holdouts.jsonl"
+    with holdouts_path.open("a") as fh:
+        fh.write("not json at all\n")
+
+    results = store.read_holdout_results(run_id, "weapon_a")
+    assert len(results) == 1
+    counts = store.corrupt_record_counts()
+    assert counts[(run_id, "weapon_a")] == 1
+
+
+def test_corrupt_record_counts_is_readonly_snapshot(tmp_path: Path) -> None:
+    store = RunStore(tmp_path)
+    run_id = store.start_run(["weapon_a"])
+    iterations_path = tmp_path / run_id / "weapon_a" / "iterations.jsonl"
+    iterations_path.parent.mkdir(parents=True, exist_ok=True)
+    iterations_path.write_text("garbage\n")
+    store.read_iteration_records(run_id, "weapon_a")
+
+    snapshot = store.corrupt_record_counts()
+    snapshot[("foo", "bar")] = 99
+    # Mutating the snapshot must not affect future reads.
+    assert ("foo", "bar") not in store.corrupt_record_counts()
+
+
+def test_concurrent_appends_preserve_line_integrity(tmp_path: Path) -> None:
+    """With flock in place, concurrent writers must not interleave bytes.
+
+    This is a best-effort check: run enough threads with enough payload that
+    any bug would likely produce at least one malformed line.
+    """
+    store = RunStore(tmp_path)
+    run_id = store.start_run(["weapon_a"])
+    record = _make_iteration(_spec())
+    # Cached JSON — the exact serialized form every thread will append.
+    payload = record.model_dump_json()
+    writes_per_thread = 20
+    num_threads = 8
+
+    def worker() -> None:
+        for _ in range(writes_per_thread):
+            store.record_iteration(run_id, "weapon_a", record)
+
+    threads = [threading.Thread(target=worker) for _ in range(num_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    iterations_path = tmp_path / run_id / "weapon_a" / "iterations.jsonl"
+    lines = iterations_path.read_text().splitlines()
+    assert len(lines) == writes_per_thread * num_threads
+    for line in lines:
+        # Every line should be a complete serialized IterationRecord.
+        assert line == payload

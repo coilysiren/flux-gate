@@ -70,7 +70,15 @@ with two append-only JSONL files: `iterations.jsonl` (one `IterationRecord`
 per line) and `holdouts.jsonl` (one `HoldoutResult` per line). `record_*`
 calls append; `read_*` calls read the whole file. JSONL is chosen so that
 multiple subagent processes — possibly fronted by separate Claude Code
-sessions — can append concurrently without coordinating on a lock.
+sessions — can append concurrently. On POSIX, each append takes an
+`fcntl.flock` to serialize writers and prevent byte interleaving.
+
+On read, corrupt JSONL lines are skipped with a logged warning and tallied
+in `RunStore.corrupt_record_counts()`; the host can surface the counts if
+it cares about partial buffers. The manifest carries a `schema_version`
+field (current value: `gauntlet.runs.SCHEMA_VERSION`) so future layout
+changes have something to key off; readers tolerate old buffers that
+predate the field.
 
 The buffer is short-lived: one run, one host session. Nothing depends on
 state surviving across runs. If a run crashes, restart from `start_run`.
