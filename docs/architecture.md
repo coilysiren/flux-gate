@@ -120,7 +120,11 @@ Adapters implement both ``send`` (HTTP shorthand) and ``execute``
 
 **Why LLM providers are configurable per-role?** The Attacker and Inspector
 can use different providers (e.g., GPT-4 vs Claude) so users can mix strengths
-or reduce cost.
+or reduce cost. The same knob also supports the single-provider case: an
+agentic-loop consumer running entirely inside one auth context (one
+subscription, one MCP surface) sets both roles to the same provider. The
+per-role configurability is the primitive; cross-provider and single-provider
+are both first-class configurations of it.
 
 **Why Arsenals?** Individual weapons test one property at a time, which is the
 right granularity for authoring and debugging. But CI pipelines and agentic

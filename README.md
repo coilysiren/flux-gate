@@ -49,7 +49,11 @@ each with a pair of environment variables:
 | `GAUNTLET_INSPECTOR_KEY` | API key for the Inspector's provider |
 
 The default models are `gpt-4o` for OpenAI and `claude-opus-4-5` for Anthropic.
-Using different providers for each role is intentional — model diversity reduces blind spots.
+
+Two valid configurations:
+
+- **Cross-provider (recommended for CI and standalone runs).** Attacker and Inspector on different providers. Model diversity reduces shared blind spots. This is the default posture.
+- **Single-provider (recommended for agentic-loop consumers).** Both roles on the same provider. Appropriate when the consumer is an orchestrator running against a single subscription (e.g., a dark-factory-style pipeline running entirely within one Claude Code auth context). Simpler integration, one credential, one MCP surface. Trades some blind-spot coverage for integration simplicity.
 
 ### CLI
 

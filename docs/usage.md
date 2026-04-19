@@ -19,7 +19,7 @@ export GAUNTLET_INSPECTOR_TYPE=anthropic
 export GAUNTLET_INSPECTOR_KEY=sk-ant-...
 ```
 
-Using different providers for Attacker and Inspector is intentional — model diversity reduces shared blind spots. Default models are `gpt-4o` (OpenAI) and `claude-opus-4-5` (Anthropic).
+Gauntlet supports both cross-provider and single-provider configurations. Cross-provider (e.g. OpenAI Attacker + Anthropic Inspector) is the default posture — model diversity reduces shared blind spots. Single-provider (both roles on the same provider) is appropriate for agentic-loop consumers that run inside one subscription and one auth context; it trades some blind-spot coverage for integration simplicity. Default models are `gpt-4o` (OpenAI) and `claude-opus-4-5` (Anthropic).
 
 In CI, set these as secrets. In an agentic loop, they are inherited from the environment.
 
@@ -169,6 +169,18 @@ Gauntlet is the final check before declaring work done. Do not skip it.
 
 See the [README](../README.md#cli) for CLI flags and invocation syntax.
 
+### Multi-agent orchestration (dark-factory-style loops)
+
+When Gauntlet is invoked by an orchestrator that also drives code generation (a "dark factory" pipeline: product spec → planner → worker → deploy → Gauntlet → risk report → promote or iterate), the train/test split becomes load-bearing at the orchestration level as well as inside Gauntlet.
+
+Recommended role layout:
+
+- **Planner** authors `.gauntlet/weapons/*.yaml` from the product spec, **including `blockers`**. The Planner is the only role that derives invariants from the spec.
+- **Worker** generates code in its own worktree. The Worker **must never see `blockers`** — not the weapon files, not the risk report's `confirmed_failures` phrased as "you failed to preserve X". Pass it only the spec and task description. This is the orchestration-level analog of Gauntlet's internal train/test split: the Attacker never sees blockers inside Gauntlet; the Worker never sees them outside it.
+- **Orchestrator** invokes `gauntlet <deployed-url>` as a subprocess once the Worker's output is deployed. Consumes the YAML risk report. On failure, routes `confirmed_failures` back to the Planner (not the Worker) for task-level remediation — the Planner can translate "cross-user modification allowed" back into a new spec-aligned task without leaking the blocker verbatim.
+
+Gauntlet itself is indifferent to how Weapons were produced. The separation above is an orchestrator concern, not a Gauntlet-CLI concern. But if your orchestrator plans to re-invoke Gauntlet after Worker iteration, keep the weapon files stable across the loop — the value of the holdout evaporates if `blockers` churn alongside the code under test.
+
 ## Interpret results and act
 
 Gauntlet outputs a YAML risk report:
@@ -202,7 +214,7 @@ A `high` or `critical` result means the agent has drifted from the intended beha
 
 Save the `confirmed_failures` from each run. Over time this becomes a knowledge base of failure patterns. Reference it when writing new weapons and reviewing code — recurring failures indicate systemic gaps in weapon coverage.
 
-## Example AGENTS.md
+## Example AGENTS.md — single-agent workflow
 
 If your coding agent reads an `AGENTS.md` (or `CLAUDE.md`, `GEMINI.md`, etc.) to learn project conventions, add a section that tells it to run Gauntlet as a final step. Here is a complete example you can adapt:
 
@@ -241,3 +253,34 @@ After each Gauntlet run, save the `confirmed_failures` list. Reference it when
 writing new code — recurring failures indicate blind spots that need dedicated
 weapons or architectural fixes.
 ```
+
+## Example AGENTS.md — multi-agent / dark-factory workflow
+
+If your orchestrator dispatches distinct Planner and Worker sub-agents (see [Multi-agent orchestration](#multi-agent-orchestration-dark-factory-style-loops) above), the conventions split by role. Example shape for a Worker `AGENTS.md`:
+
+```markdown
+# AGENTS.md (Worker role)
+
+## Scope
+
+You are the Worker. You write code to satisfy the task description passed to you by the Orchestrator. You do not author invariants, you do not see `blockers`, and you do not run Gauntlet.
+
+## Hidden context
+
+Do not read `.gauntlet/weapons/*.yaml`. Those files contain holdout invariants the Orchestrator uses to validate your output. Reading them would defeat the train/test split and invalidate the run.
+
+If you need to know what behavior is expected, read the task description and the product spec. Do not infer from weapon files.
+
+## Workflow
+
+1. Implement the task in your worktree.
+2. Run the project's existing tests — `pytest` (or equivalent).
+3. Commit on your worktree branch.
+4. Return. The Orchestrator deploys, invokes Gauntlet, and routes any findings back to the Planner.
+
+## If Gauntlet findings come back
+
+The Orchestrator will hand you a paraphrased task ("add a 403 response when a non-owner attempts PATCH"). You implement the task. You do not see the original `blockers` line the finding was derived from.
+```
+
+A matching Planner `AGENTS.md` would describe the reverse: author `.gauntlet/weapons/*.yaml` from the spec (including `blockers`), never write code, and translate Gauntlet findings back into spec-aligned Worker tasks without leaking blocker text.
