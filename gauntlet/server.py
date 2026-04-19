@@ -13,6 +13,7 @@ the subagents' MCP-tool allowlists, plus at the buffer boundary by
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,9 @@ from typing import Any
 import yaml
 from mcp.server.fastmcp import FastMCP
 
+from ._findings_store import DEFAULT_FINDINGS_PATH, FindingsStore
 from ._log import configure_logging, log_tool_call
+from ._mutator import mutate_plans as _mutate_plans
 from ._plausibility import check_holdout_plausibility
 from .executor import Drone
 from .http import HttpApi
@@ -45,6 +48,8 @@ configure_logging()
 mcp = FastMCP("gauntlet")
 
 _DEFAULT_WEAPONS_PATH = ".gauntlet/weapons"
+
+_LOG = logging.getLogger(__name__)
 
 # Relative path resolved against cwd at filesystem-access time, so a host that
 # chdir's into the project root gets the right buffer location.
@@ -119,6 +124,12 @@ def assemble_run_report(
     Reads the iteration and holdout buffers the server owns and assembles
     the report. Returns ``risk_report`` plus a clearance recommendation
     (``pass``, ``conditional``, or ``block``).
+
+    Side effect: confirmed-failure ``Finding``s from the iteration buffer
+    are persisted to the cross-run ``FindingsStore`` so
+    ``recurring_failures`` can surface repeated issues. Store writes are
+    wrapped in a try/except and logged; a failure to write never aborts
+    the report call.
     """
     with log_tool_call("assemble_run_report", run_id=run_id, weapon_id=weapon_id):
         records = _run_store.read_iteration_records(run_id, weapon_id)
@@ -127,6 +138,25 @@ def assemble_run_report(
         ]
 
         report, clearance = build_risk_report(records, holdouts, clearance_threshold)
+
+        try:
+            store = FindingsStore(DEFAULT_FINDINGS_PATH)
+            confirmed_issues = set(report.confirmed_failures)
+            for record in records:
+                for finding in record.findings:
+                    if finding.is_anomaly:
+                        continue
+                    if finding.issue not in confirmed_issues:
+                        continue
+                    store.record(weapon_id, run_id, finding)
+        except Exception as exc:  # pragma: no cover - defensive
+            _LOG.warning(
+                "Failed to persist findings to cross-run store (run_id=%s weapon_id=%s): %s",
+                run_id,
+                weapon_id,
+                exc,
+            )
+
         return {
             "risk_report": report.model_dump(),
             "clearance": clearance.model_dump() if clearance else None,
@@ -257,6 +287,104 @@ def read_holdout_results(run_id: str, weapon_id: str) -> list[HoldoutResult]:
 
 
 @mcp.tool()
+def recurring_failures(
+    weapon_id: str,
+    lookback: int = 5,
+    findings_path: str = DEFAULT_FINDINGS_PATH,
+) -> list[dict[str, Any]]:
+    """Return issues seen in ≥ 2 of the last ``lookback`` runs for a weapon.
+
+    Reads ``<findings_path>/<weapon_id>.jsonl`` (populated as a side effect
+    of ``assemble_run_report``) and groups findings by ``issue`` across the
+    most recent ``lookback`` distinct run ids. Returns one entry per
+    recurring issue: ``{issue, occurrences, run_ids}``, sorted by
+    occurrence count descending then issue ascending.
+
+    Intended for the Orchestrator (host skill) to surface "this same
+    confirmed_failure showed up in 3 of the last 5 runs" signal. Not
+    allowlisted for any per-role subagent.
+    """
+    return FindingsStore(findings_path).recurring(weapon_id, lookback=lookback)
+
+
+@mcp.tool()
+def mutate_plans(
+    run_id: str,
+    weapon_id: str,
+    max_variants: int = 4,
+) -> list[Plan]:
+    """Return deterministic plan variants derived from prior iterations.
+
+    Reads every ``IterationRecord`` previously appended for ``(run_id,
+    weapon_id)``, collects the unique plans across them (by ``name``), and
+    runs them through the internal mutator. The mutator applies four
+    strategies (drop a body field, rotate users, negate expected status,
+    reverse step order) and returns up to ``max_variants`` plan variants
+    whose names are suffixed with ``:mut-<strategy>``.
+
+    The Attacker subagent calls this between iterations to explore variants
+    of plans that have already landed, without spending LLM tokens on the
+    mutation step. The mutator sees only what the Attacker has already
+    seen, so there is no train/test split risk.
+    """
+    records = _run_store.read_iteration_records(run_id, weapon_id)
+    seen: dict[str, Plan] = {}
+    for record in records:
+        for plan in record.plans:
+            seen.setdefault(plan.name, plan)
+    seed_plans = list(seen.values())
+    return _mutate_plans(seed_plans, max_variants=max_variants)
+
+
+@mcp.tool()
+def replay_finding(
+    run_id: str,
+    weapon_id: str,
+    finding_index: int,
+    url: str,
+    user_headers: dict[str, dict[str, str]] | None = None,
+) -> ExecutionResult:
+    """Re-execute the ``ReplayBundle`` of a stored finding against the SUT.
+
+    Walks the weapon's iteration records in append order, flattens their
+    findings, and picks the ``finding_index``-th entry (0-indexed). The
+    finding must carry a populated ``replay_bundle`` — ``ReplayBundle.steps``
+    are converted 1:1 into a ``Plan`` with ``category="replay"`` and no
+    assertions, then executed through the normal Drone path.
+
+    Useful for "did the fix actually work" loops: the host picks a stored
+    finding, calls ``replay_finding`` against a patched SUT, and checks
+    whether the reproduced ``ExecutionResult`` still shows the failure.
+
+    Raises ``ValueError`` if the index is out of range or the targeted
+    finding has no ``replay_bundle``.
+    """
+    records = _run_store.read_iteration_records(run_id, weapon_id)
+    findings = [finding for record in records for finding in record.findings]
+    if finding_index < 0 or finding_index >= len(findings):
+        raise ValueError(
+            f"finding_index {finding_index} out of range; "
+            f"only {len(findings)} findings recorded for weapon {weapon_id!r}"
+        )
+    finding = findings[finding_index]
+    if finding.replay_bundle is None:
+        raise ValueError(
+            f"Finding {finding.issue!r} has no replay_bundle; cannot replay. "
+            "The Inspector should populate replay_bundle on every finding "
+            "by copying ReplayStep data from the offending ExecutionStepResult(s)."
+        )
+    plan = Plan(
+        name=f"replay:{finding.issue}",
+        category="replay",
+        goal="reproduce finding",
+        steps=[PlanStep(user=s.user, request=s.request) for s in finding.replay_bundle.steps],
+        assertions=[],
+    )
+    drone = Drone(HttpApi(url, user_headers=user_headers or {}))
+    return drone.run_plan(plan)
+
+
+@mcp.tool()
 def assemble_final_clearance(
     run_id: str,
     clearance_threshold: float = 0.90,
@@ -306,10 +434,13 @@ __all__ = [
     "list_weapons",
     "main",
     "mcp",
+    "mutate_plans",
     "read_holdout_results",
     "read_iteration_records",
     "record_holdout_result",
     "record_iteration",
+    "recurring_failures",
+    "replay_finding",
     "start_run",
 ]
 

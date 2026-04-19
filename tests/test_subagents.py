@@ -20,6 +20,7 @@ ATTACKER_ALLOW = {
     "mcp__gauntlet__execute_plan",
     "mcp__gauntlet__read_iteration_records",
     "mcp__gauntlet__record_iteration",
+    "mcp__gauntlet__mutate_plans",
 }
 ATTACKER_FORBID = {
     "mcp__gauntlet__get_weapon",

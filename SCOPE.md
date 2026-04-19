@@ -10,7 +10,7 @@ These are the contracts a host orchestrator binds to. They cannot move silently.
 
 ### MCP tools
 
-The 11 tools exposed by `gauntlet/server.py`:
+The 13 tools exposed by `gauntlet/server.py`:
 
 | Tool | Signature shape |
 |---|---|
@@ -22,8 +22,11 @@ The 11 tools exposed by `gauntlet/server.py`:
 | `read_iteration_records(run_id, weapon_id)` | → `list[IterationRecord]` |
 | `record_holdout_result(run_id, weapon_id, holdout_result)` | → `{status}` |
 | `read_holdout_results(run_id, weapon_id)` | → `list[HoldoutResult]` |
-| `assemble_run_report(run_id, weapon_id, clearance_threshold)` | → `dict` |
+| `assemble_run_report(run_id, weapon_id, clearance_threshold)` | → `dict` (also persists confirmed-failure findings to the cross-run store as a side effect) |
 | `assemble_final_clearance(run_id, clearance_threshold, weapon_ids?)` | → `FinalClearance` |
+| `replay_finding(run_id, weapon_id, finding_index, url, user_headers)` | → `ExecutionResult` |
+| `mutate_plans(run_id, weapon_id, max_variants)` | → `list[Plan]` |
+| `recurring_failures(weapon_id, lookback, findings_path)` | → `list[dict]` of `{issue, occurrences, run_ids}` |
 
 Adding, renaming, removing, or changing the parameter set of any of these is a breaking change.
 
@@ -56,8 +59,6 @@ These are the things you'll be tempted to add and shouldn't, because they re-int
 
 - **CLI entry point.** Gauntlet runs only as an MCP server inside Claude Code. No `gauntlet` shell command, no `argparse`, no standalone Python invocation path.
 - **Multi-surface execution.** No CLI adapter, no WebDriver adapter, no browser automation. HTTP only. The Adapter protocol was deleted for a reason.
-- **Plan mutation engine.** The host LLM composes plans in-prompt. A deterministic Python mutator competes with the Attacker subagent and re-introduces the train/test risk we use the allowlists to avoid. (See [TODO.md](TODO.md) for the bounded "across-iteration mutation" idea, deferred until at least one production loop has battle-tested the in-prompt approach.)
-- **Cross-run persistence.** PlanStore and FindingsStore were deleted because each run is ephemeral. Re-introducing them requires a real cross-run consumer; "it might be useful" doesn't qualify.
 - **A real-time dashboard, web UI, or report renderer.** Gauntlet returns structured data; the host renders it however it wants.
 - **Multi-provider LLM abstraction.** Gauntlet does not call an LLM. The host provides the reasoning.
 - **A weapon-coverage scorer or test-coverage analyzer.** The `gauntlet-author` skill is a one-shot translator; coverage scoring is a future feature with no present consumer.
