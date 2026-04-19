@@ -135,7 +135,7 @@ If your API has an OpenAPI 3.x spec, pass `openapi_path` to `list_targets` to au
 {
   "risk_report": {
     "confidence_score": 0.06,
-    "risk_level": "critical",
+    "risk_level": "high",
     "confirmed_failures": ["unauthorized_cross_user_modification"],
     "coverage": ["GET /tasks/42", "PATCH /tasks/42", "POST /tasks"],
     "conclusion": "System fails under adversarial pressure ...",
@@ -157,9 +157,9 @@ Act based on `risk_level`:
 |---|---|
 | `low` | Promote or merge |
 | `medium` | Attempt fixes, re-run |
-| `high` or `critical` | Stop. Do not attempt automated fixes. Surface to a human. |
+| `high` | Stop. Do not attempt automated fixes. Surface to a human. |
 
-A `high` or `critical` result means the agent has drifted from intended behavior. Automated fixes are likely to make things worse; human realignment is required.
+A `high` result means the agent has drifted from intended behavior. Automated fixes are likely to make things worse; human realignment is required.
 
 ### Accumulating failure knowledge
 

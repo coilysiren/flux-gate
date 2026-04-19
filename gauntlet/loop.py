@@ -177,9 +177,7 @@ def _confidence_score(records: list[IterationRecord], coverage: list[str]) -> fl
     return round(plan_diversity * 0.35 + surface_depth * 0.35 + exploration_completeness * 0.30, 2)
 
 
-def _risk_level(findings: list[Finding]) -> Literal["low", "medium", "high", "critical"]:
-    if any(finding.severity == "critical" for finding in findings):
-        return "critical"
+def _risk_level(findings: list[Finding]) -> Literal["low", "medium", "high"]:
     if any(finding.severity == "high" for finding in findings):
         return "high"
     if any(finding.severity == "medium" for finding in findings):

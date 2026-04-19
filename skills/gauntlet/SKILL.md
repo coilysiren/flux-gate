@@ -80,7 +80,7 @@ Produce `Finding`s for real issues. Each:
 ```python
 {
   "issue": "snake_case_identifier",
-  "severity": "low|medium|high|critical",   # critical = auth bypass, data corruption; high = privilege escalation; medium = info leak; low = minor
+  "severity": "low|medium|high",             # high = auth bypass, privilege escalation, data corruption; medium = info leak; low = minor
   "confidence": 0.0-1.0,
   "rationale": "why this is a problem",
   "evidence": [{"kind": "request|response|assertion|note", "content": "specific observation"}],
@@ -97,7 +97,7 @@ Treat suspicious-but-not-violating observations as anomalies (`is_anomaly=True`,
 
 **Append** one `IterationRecord(spec, plans, execution_results, findings)` to the buffer.
 
-Optional fail-fast: if a `critical` finding appears, you may stop after the current iteration. Note this in the summary.
+Optional fail-fast: if a `high` finding appears, you may stop after the current iteration. Note this in the summary.
 
 ### Step 3 — HoldoutEvaluator: execute the withheld vitals
 
@@ -115,7 +115,7 @@ Start a fresh internal context. The Attacker/Inspector traces above inform nothi
 `assemble_run_report(iterations=iterations, holdout_results=holdout_results, clearance_threshold=0.9)` → `{risk_report, clearance}`.
 
 Show the user:
-- `risk_level` (low | medium | high | critical)
+- `risk_level` (low | medium | high)
 - `confirmed_failures` (the list of violated invariants — safe to show, these are outcomes, not blocker text)
 - `clearance.recommendation` (pass | conditional | block) if present
 - `confidence_score` and `coverage` summary
@@ -126,7 +126,7 @@ Show the user:
 |---|---|
 | `low` | Safe to promote or merge. |
 | `medium` | Attempt fixes and re-run the loop. |
-| `high` or `critical` | **Stop.** Surface to a human. Do not attempt automated fixes — the code has drifted from intended behavior and automated fixes typically make things worse. |
+| `high` | **Stop.** Surface to a human. Do not attempt automated fixes — the code has drifted from intended behavior and automated fixes typically make things worse. |
 
 Treat a `conditional` clearance as a signal for human review, not a green light.
 

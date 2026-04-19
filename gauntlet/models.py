@@ -144,7 +144,7 @@ class ReplayBundle(GauntletModel):
 
 class Finding(GauntletModel):
     issue: str
-    severity: Literal["low", "medium", "high", "critical"]
+    severity: Literal["low", "medium", "high"]
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str
     weapon_id: str | None = None
@@ -284,7 +284,7 @@ class Clearance(GauntletModel):
 
 class RiskReport(GauntletModel):
     confidence_score: float = Field(ge=0.0, le=1.0)
-    risk_level: Literal["low", "medium", "high", "critical"]
+    risk_level: Literal["low", "medium", "high"]
     summary: list[str]
     confirmed_failures: list[str]
     suspicious_patterns: list[str]
