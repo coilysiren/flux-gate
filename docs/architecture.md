@@ -112,7 +112,6 @@ The split is enforced at two layers:
 
 The Orchestrator role (the host skill itself) retains every tool but is responsible for not paraphrasing blockers back into Attacker/Inspector dispatch prompts. That is the only remaining discipline-level rule, and it is bounded — the Orchestrator only reads `get_weapon` output if it explicitly asks for it, which it should not need to do.
 
-A documented single-host fallback mode (no subagent dispatch) is available for environments that do not support subagents; in that mode the entire split degrades to prompt discipline, as in earlier versions of the skill.
 
 ## Host-driven loop shape
 

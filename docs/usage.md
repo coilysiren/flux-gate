@@ -161,16 +161,3 @@ Act based on `risk_level`:
 
 A `high` result means the agent has drifted from intended behavior. Automated fixes are likely to make things worse; human realignment is required.
 
-### Accumulating failure knowledge
-
-Save the `confirmed_failures` from each run. Over time this becomes a knowledge base of failure patterns. Reference it when writing new weapons and reviewing code - recurring failures indicate systemic gaps in weapon coverage. `PlanStore` and `FindingsStore` in `gauntlet/store.py` persist plans and findings to disk indexed by weapon ID; the host can import them as a library module if it wants programmatic access.
-
-## Multi-agent orchestration (dark-factory loops)
-
-In a dark-factory pipeline (product spec → Planner → Worker → deploy → Gauntlet → risk report → promote or iterate), the train/test split is load-bearing at the orchestration layer as well as inside Gauntlet:
-
-- **Planner** authors `.gauntlet/weapons/*.yaml` from the product spec, **including `blockers`**. Only the Planner derives invariants from the spec.
-- **Worker** generates code in its own worktree. The Worker **must never see `blockers`** - not the weapon files, not the `confirmed_failures` phrased as "you failed to preserve X". Pass it only the spec and task description.
-- **Orchestrator** drives Gauntlet via the MCP surface post-deploy. On failure, routes `confirmed_failures` back to the Planner for task-level remediation - the Planner translates "cross-user modification allowed" back into a new spec-aligned task without leaking blocker verbatim.
-
-Keep weapon files stable across Worker iterations. The value of the holdout evaporates if `blockers` churn alongside the code under test.

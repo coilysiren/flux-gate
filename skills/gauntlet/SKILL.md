@@ -100,21 +100,6 @@ The subagent model fixes that structurally:
 
 That is kernel-level enforcement of the split, not a stylistic recommendation.
 
-## Fallback: single-host mode
-
-If the host environment does not support subagent dispatch, you can drive all four roles from this session by context-switching, the way this skill used to. In that mode, the train/test split is held only by your own prompt discipline:
-
-| Role context you're in | Safe to read | Forbidden to read |
-|---|---|---|
-| **Attacker** | `list_weapons` briefs, `list_targets`, own prior `Finding`s, own prior `ExecutionResult`s | `get_weapon` output, any `blockers` text, any `holdout_result` |
-| **Inspector** | `ExecutionResult`s, own prior `Finding`s | `get_weapon` output, any `blockers` text, any `holdout_result` |
-| **HoldoutEvaluator** | `get_weapon` output including `blockers`, `holdout_result`s | Attacker's plans / Inspector's findings (avoid carryover) |
-| **Orchestrator** | Everything except never reads and paraphrases `blockers` back to the Attacker | — |
-
-When you transition between role contexts, **do not carry content over verbatim**. If you must summarize something across roles, strip blocker text. The Attacker never sees a blocker, not even a paraphrase of one.
-
-Prefer subagent dispatch whenever the environment supports it — it is the only mode where the split is not a discipline question.
-
 ## Single-call invocations
 
 Some prompts want a summary, not a full run:

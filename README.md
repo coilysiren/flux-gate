@@ -41,20 +41,6 @@ On first invocation, `uv` auto-resolves the Python dependencies for the MCP serv
 
 Without the skill, a host could still call the MCP tools ad-hoc, but it would have to re-derive the loop every time and would be far more likely to collapse the train/test split. The plugin delivery is what makes the four pieces stay in sync.
 
-### Manual install (without the plugin)
-
-If you are not using the plugin system, you can install the server and skill separately:
-
-```bash
-# Install the package + register the MCP server
-uv add gauntlet
-claude mcp add gauntlet -- uv run gauntlet-mcp
-
-# Copy the skill into the project
-mkdir -p .claude/skills/gauntlet
-cp path/to/gauntlet/skills/gauntlet/SKILL.md .claude/skills/gauntlet/SKILL.md
-```
-
 ## MCP tools
 
 | Tool | Purpose | Allowed in role |
@@ -73,7 +59,7 @@ cp path/to/gauntlet/skills/gauntlet/SKILL.md .claude/skills/gauntlet/SKILL.md
 | `assemble_final_clearance(run_id, clearance_threshold)` | Aggregate every per-weapon report in the run into one overall `FinalClearance` (pass / conditional / block) | Orchestrator, HoldoutEvaluator |
 | `default_iteration_specs()` | Return the reference 4-stage escalation ladder | Orchestrator |
 
-The train/test split is enforced at the permission layer via MCP-tool allowlists on each per-role subagent — see the [`agents/`](agents/) directory. The Attacker subagent literally cannot call `get_weapon`, the Inspector subagent cannot call `get_weapon` or read holdout results, and the HoldoutEvaluator subagent cannot read the iteration buffer. A documented single-host fallback (no subagent dispatch) is available for environments that don't support subagents; see the skill for details.
+The train/test split is enforced at the permission layer via MCP-tool allowlists on each per-role subagent — see the [`agents/`](agents/) directory. The Attacker subagent literally cannot call `get_weapon`, the Inspector subagent cannot call `get_weapon` or read holdout results, and the HoldoutEvaluator subagent cannot read the iteration buffer.
 
 ## Project config directory
 
