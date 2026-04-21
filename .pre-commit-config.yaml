@@ -19,3 +19,13 @@ repos:
           - requests>=2.33.1
           - types-PyYAML>=6.0.12
           - types-requests>=2.33.0
+
+  - repo: local
+    hooks:
+      - id: trufflehog
+        name: trufflehog (secret scan)
+        description: Detect secrets in staged changes using local trufflehog binary.
+        entry: trufflehog git file://. --since-commit HEAD --results=verified,unknown --fail --no-update
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, pre-push]
