@@ -3,7 +3,7 @@
 Each Gauntlet run is otherwise fully ephemeral: ``.gauntlet/runs/<run_id>/``
 is wiped between runs in practice, and nothing else outlives a host
 session. This store is the one deliberate exception — a tiny JSONL file
-per weapon recording ``{run_id, timestamp, finding}`` entries so a host
+per trial recording ``{run_id, timestamp, finding}`` entries so a host
 can ask "has this same confirmed failure shown up in multiple recent
 runs?".
 
@@ -38,9 +38,9 @@ _LOG = logging.getLogger(__name__)
 
 
 class FindingsStore:
-    """Filesystem-backed per-weapon findings log with JSONL records.
+    """Filesystem-backed per-trial findings log with JSONL records.
 
-    Records for weapon ``W`` live under ``<root>/<W>.jsonl`` with one JSON
+    Records for trial ``W`` live under ``<root>/<W>.jsonl`` with one JSON
     object per line::
 
         {"schema_version": 1, "run_id": ..., "timestamp": ..., "finding": {...}}
@@ -53,9 +53,9 @@ class FindingsStore:
     def __init__(self, root: str | Path = DEFAULT_FINDINGS_PATH) -> None:
         self._root = Path(root)
 
-    def record(self, weapon_id: str, run_id: str, finding: Finding) -> None:
-        """Append one ``{run_id, timestamp, finding}`` line to the weapon's file."""
-        self._validate_weapon_id(weapon_id)
+    def record(self, trial_id: str, run_id: str, finding: Finding) -> None:
+        """Append one ``{run_id, timestamp, finding}`` line to the trial's file."""
+        self._validate_trial_id(trial_id)
         payload = {
             "schema_version": _SCHEMA_VERSION,
             "run_id": run_id,
@@ -63,11 +63,11 @@ class FindingsStore:
             "finding": json.loads(finding.model_dump_json()),
         }
         self._root.mkdir(parents=True, exist_ok=True)
-        path = self._weapon_file(weapon_id)
+        path = self._trial_file(trial_id)
         with path.open("a") as fh:
             fh.write(json.dumps(payload) + "\n")
 
-    def recurring(self, weapon_id: str, lookback: int = 5) -> list[dict[str, Any]]:
+    def recurring(self, trial_id: str, lookback: int = 5) -> list[dict[str, Any]]:
         """Group findings by ``issue`` across the most recent ``lookback`` runs.
 
         Returns a list of ``{"issue": ..., "occurrences": N, "run_ids":
@@ -78,8 +78,8 @@ class FindingsStore:
         A run is counted once even if it produced the same issue multiple
         times (e.g. separate iterations each flagged ``cross_user_patch``).
         """
-        self._validate_weapon_id(weapon_id)
-        path = self._weapon_file(weapon_id)
+        self._validate_trial_id(trial_id)
+        path = self._trial_file(trial_id)
         if not path.exists():
             return []
 
@@ -122,22 +122,22 @@ class FindingsStore:
         recurring.sort(key=lambda r: (-int(r["occurrences"]), str(r["issue"])))
         return recurring
 
-    def clear(self, weapon_id: str) -> None:
-        """Delete the weapon's findings file. No-op if it doesn't exist."""
-        self._validate_weapon_id(weapon_id)
-        path = self._weapon_file(weapon_id)
+    def clear(self, trial_id: str) -> None:
+        """Delete the trial's findings file. No-op if it doesn't exist."""
+        self._validate_trial_id(trial_id)
+        path = self._trial_file(trial_id)
         if path.exists():
             path.unlink()
 
     # --- internal -----------------------------------------------------------
 
-    def _weapon_file(self, weapon_id: str) -> Path:
-        return self._root / f"{weapon_id}.jsonl"
+    def _trial_file(self, trial_id: str) -> Path:
+        return self._root / f"{trial_id}.jsonl"
 
     @staticmethod
-    def _validate_weapon_id(weapon_id: str) -> None:
-        if not weapon_id or "/" in weapon_id or "\\" in weapon_id or weapon_id in {".", ".."}:
-            raise ValueError(f"Invalid weapon_id {weapon_id!r}")
+    def _validate_trial_id(trial_id: str) -> None:
+        if not trial_id or "/" in trial_id or "\\" in trial_id or trial_id in {".", ".."}:
+            raise ValueError(f"Invalid trial_id {trial_id!r}")
 
     @staticmethod
     def _iter_entries(path: Path) -> list[dict[str, Any]]:

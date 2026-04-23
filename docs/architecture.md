@@ -24,7 +24,7 @@ gauntlet/
 ├── _mutator.py          # Deterministic plan mutator (drop field, rotate
 │                        #   users, negate expected, reverse order); internal,
 │                        #   exposed via the mutate_plans MCP tool
-├── _findings_store.py   # Cross-run FindingsStore (JSONL per weapon); internal,
+├── _findings_store.py   # Cross-run FindingsStore (JSONL per trial); internal,
 │                        #   exposed via assemble_run_report (writer) and
 │                        #   recurring_failures (reader)
 └── server.py            # FastMCP server exposing the gauntlet tools
@@ -55,7 +55,7 @@ agents/                          # per-role subagent definitions
 └── gauntlet-holdout-evaluator.md
 skills/                          # host-side skills
 ├── gauntlet/SKILL.md            # the Orchestrator loop
-└── gauntlet-author/SKILL.md     # spec → weapons authoring skill
+└── gauntlet-author/SKILL.md     # spec → trials authoring skill
 ```
 
 The skills are pure prose (no executable code); they encode role discipline that the host follows when dispatching MCP calls and subagents.
@@ -64,24 +64,24 @@ The skills are pure prose (no executable code); they encode role discipline that
 
 | Tool | Returns | Side effect |
 |---|---|---|
-| `list_weapons(weapons_path)` | `list[dict]` of `{id, title, description}` (no blockers) | reads YAML from disk |
-| `get_weapon(weapon_id, weapons_path)` | `Weapon` (with blockers) | reads YAML from disk |
+| `list_trials(trials_path)` | `list[dict]` of `{id, title, description}` (no blockers) | reads YAML from disk |
+| `get_trial(trial_id, trials_path)` | `Trial` (with blockers) | reads YAML from disk |
 | `execute_plan(url, plan, user_headers)` | `ExecutionResult` | sends real HTTP requests to the SUT |
-| `start_run(weapon_ids)` | `{run_id}` | creates `.gauntlet/runs/<run_id>/` |
-| `record_iteration(run_id, weapon_id, iteration_record)` | `{status: ok}` | appends one `IterationRecord` to the buffer; warns on findings without `replay_bundle` |
-| `read_iteration_records(run_id, weapon_id)` | `list[IterationRecord]` | reads from the buffer |
-| `record_holdout_result(run_id, weapon_id, holdout_result)` | `{status: ok, warnings: [...]}` | appends one `HoldoutResult` to the buffer; runs heuristic plausibility checks against the blocker |
-| `read_holdout_results(run_id, weapon_id)` | `list[HoldoutResult]` | reads from the buffer |
-| `assemble_run_report(run_id, weapon_id, threshold)` | `dict` with `risk_report` + `clearance` | reads from the buffer; writes confirmed-failure findings to `.gauntlet/findings/<weapon_id>.jsonl` |
-| `assemble_final_clearance(run_id, clearance_threshold, weapon_ids?)` | `FinalClearance` | reads every per-weapon report from the buffer and aggregates |
-| `replay_finding(run_id, weapon_id, finding_index, url, user_headers)` | `ExecutionResult` | walks the iteration buffer, converts a stored finding's `ReplayBundle` to a `Plan`, and executes it against the SUT |
-| `mutate_plans(run_id, weapon_id, max_variants)` | `list[Plan]` | reads the iteration buffer; deterministic — no network, no state change |
-| `recurring_failures(weapon_id, lookback, findings_path)` | `list[dict]` of `{issue, occurrences, run_ids}` | reads `.gauntlet/findings/<weapon_id>.jsonl` |
+| `start_run(trial_ids)` | `{run_id}` | creates `.gauntlet/runs/<run_id>/` |
+| `record_iteration(run_id, trial_id, iteration_record)` | `{status: ok}` | appends one `IterationRecord` to the buffer; warns on findings without `replay_bundle` |
+| `read_iteration_records(run_id, trial_id)` | `list[IterationRecord]` | reads from the buffer |
+| `record_holdout_result(run_id, trial_id, holdout_result)` | `{status: ok, warnings: [...]}` | appends one `HoldoutResult` to the buffer; runs heuristic plausibility checks against the blocker |
+| `read_holdout_results(run_id, trial_id)` | `list[HoldoutResult]` | reads from the buffer |
+| `assemble_run_report(run_id, trial_id, threshold)` | `dict` with `risk_report` + `clearance` | reads from the buffer; writes confirmed-failure findings to `.gauntlet/findings/<trial_id>.jsonl` |
+| `assemble_final_clearance(run_id, clearance_threshold, trial_ids?)` | `FinalClearance` | reads every per-trial report from the buffer and aggregates |
+| `replay_finding(run_id, trial_id, finding_index, url, user_headers)` | `ExecutionResult` | walks the iteration buffer, converts a stored finding's `ReplayBundle` to a `Plan`, and executes it against the SUT |
+| `mutate_plans(run_id, trial_id, max_variants)` | `list[Plan]` | reads the iteration buffer; deterministic — no network, no state change |
+| `recurring_failures(trial_id, lookback, findings_path)` | `list[dict]` of `{issue, occurrences, run_ids}` | reads `.gauntlet/findings/<trial_id>.jsonl` |
 
 ### Run-scoped buffer
 
 `start_run` initializes a per-run filesystem buffer under `.gauntlet/runs/<run_id>/`
-(resolved against the host's cwd). Each weapon gets its own subdirectory
+(resolved against the host's cwd). Each trial gets its own subdirectory
 with two append-only JSONL files: `iterations.jsonl` (one `IterationRecord`
 per line) and `holdouts.jsonl` (one `HoldoutResult` per line). `record_*`
 calls append; `read_*` calls read the whole file. JSONL is chosen so that
@@ -110,7 +110,7 @@ report, and the Inspector is expected to populate it from the offending
 
 ### Cross-run findings store
 
-`.gauntlet/findings/<weapon_id>.jsonl` accumulates confirmed-failure
+`.gauntlet/findings/<trial_id>.jsonl` accumulates confirmed-failure
 `Finding`s across runs for one consumer: `recurring_failures`, which
 surfaces issues that showed up in ≥ 2 of the last N runs. Writes happen
 as a side effect of `assemble_run_report`, wrapped in a try/except so a
@@ -123,15 +123,15 @@ the one question `recurring_failures` asks.
 The split is enforced at two layers:
 
 1. **MCP-tool allowlists on per-role subagents.** The plugin ships three subagent definitions in `agents/`:
-   - `gauntlet-attacker` — allowlist excludes `get_weapon`, `read_holdout_results`, `record_holdout_result`. Can read its own prior plans + Inspector findings via `read_iteration_records`, and derive deterministic variants via `mutate_plans`.
-   - `gauntlet-inspector` — allowlist excludes `get_weapon`, `read_holdout_results`, `record_holdout_result`, and even the SUT-execution tools. Reads execution results via the iteration buffer; emits findings via `record_iteration`, each populating `replay_bundle` so `replay_finding` can reproduce them.
-   - `gauntlet-holdout-evaluator` — allowlist includes `get_weapon` and `record_holdout_result`. Excludes `read_iteration_records` so prior Attacker/Inspector traces cannot leak in. Runs from fresh context per weapon.
+   - `gauntlet-attacker` — allowlist excludes `get_trial`, `read_holdout_results`, `record_holdout_result`. Can read its own prior plans + Inspector findings via `read_iteration_records`, and derive deterministic variants via `mutate_plans`.
+   - `gauntlet-inspector` — allowlist excludes `get_trial`, `read_holdout_results`, `record_holdout_result`, and even the SUT-execution tools. Reads execution results via the iteration buffer; emits findings via `record_iteration`, each populating `replay_bundle` so `replay_finding` can reproduce them.
+   - `gauntlet-holdout-evaluator` — allowlist includes `get_trial` and `record_holdout_result`. Excludes `read_iteration_records` so prior Attacker/Inspector traces cannot leak in. Runs from fresh context per trial.
 
    These allowlists are enforced by Claude Code's permission layer before the MCP server sees a call; a subagent that tries to use a forbidden tool fails at the permission check. This is structural enforcement of the split, not prompt discipline.
 
 2. **Schema enforcement at the buffer.** `record_iteration` rejects any `IterationRecord` whose findings carry a non-null `violated_blocker`. The Inspector never sees blocker text, so a populated value would mean a contamination event.
 
-The Orchestrator role (the host skill itself) retains every tool but is responsible for not paraphrasing blockers back into Attacker/Inspector dispatch prompts. That is the only remaining discipline-level rule, and it is bounded — the Orchestrator only reads `get_weapon` output if it explicitly asks for it, which it should not need to do.
+The Orchestrator role (the host skill itself) retains every tool but is responsible for not paraphrasing blockers back into Attacker/Inspector dispatch prompts. That is the only remaining discipline-level rule, and it is bounded — the Orchestrator only reads `get_trial` output if it explicitly asks for it, which it should not need to do.
 
 
 ## Host-driven loop shape
@@ -139,22 +139,22 @@ The Orchestrator role (the host skill itself) retains every tool but is responsi
 ```
 (Orchestrator: host agent in a Claude Code session, runs the gauntlet skill)
 │
-├── list_weapons() → pick weapons
-│   start_run(weapon_ids=[...]) → run_id
+├── list_trials() → pick trials
+│   start_run(trial_ids=[...]) → run_id
 │   build the inline 4-stage IterationSpec list
 │
-├── For each weapon, for each iteration spec (4):
-│   ├── dispatch gauntlet-attacker subagent (run_id, weapon_id, spec, url)
+├── For each trial, for each iteration spec (4):
+│   ├── dispatch gauntlet-attacker subagent (run_id, trial_id, spec, url)
 │   │     → composes plans, executes them, appends IterationRecord
 │   │
-│   └── dispatch gauntlet-inspector subagent (run_id, weapon_id, spec)
+│   └── dispatch gauntlet-inspector subagent (run_id, trial_id, spec)
 │         → reads buffer, emits Findings, appends IterationRecord (findings only)
 │
-├── For each weapon, dispatch gauntlet-holdout-evaluator subagent (run_id, weapon_id, url)
-│     → fresh context, reads weapon blockers, derives acceptance plans,
+├── For each trial, dispatch gauntlet-holdout-evaluator subagent (run_id, trial_id, url)
+│     → fresh context, reads trial blockers, derives acceptance plans,
 │       executes them, appends one HoldoutResult per blocker
 │
-└── For each weapon: assemble_run_report(run_id, weapon_id) → RiskReport + Clearance
+└── For each trial: assemble_run_report(run_id, trial_id) → RiskReport + Clearance
 ```
 
 ## Deterministic vs non-deterministic segments
@@ -162,7 +162,7 @@ The Orchestrator role (the host skill itself) retains every tool but is responsi
 **Deterministic (no network, no LLM):**
 
 - `Drone` - resolves path templates, calls the adapter, evaluates assertions.
-- Assertion evaluation, risk-report assembly, weapon assessment - all pure Python.
+- Assertion evaluation, risk-report assembly, trial assessment - all pure Python.
 
 **Non-deterministic (network):**
 

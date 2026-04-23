@@ -2,7 +2,7 @@
 
 Hypothesis-driven sanity checks for ``_confidence_score``,
 ``aggregate_final_clearance``, and ``build_risk_report``. These assert
-structural properties (boundedness, determinism, "any high-severity per-weapon
+structural properties (boundedness, determinism, "any high-severity per-trial
 blocks the final"), not specific numeric outputs.
 """
 
@@ -21,7 +21,7 @@ from gauntlet import (
     IterationSpec,
     Plan,
     RiskReport,
-    WeaponReport,
+    TrialReport,
     aggregate_final_clearance,
     build_risk_report,
 )
@@ -40,7 +40,7 @@ def _plan_strategy() -> st.SearchStrategy[Plan]:
         goal=st.text(min_size=1, max_size=20),
         steps=st.just([]),
         assertions=st.just([]),
-        weapon_id=st.none(),
+        trial_id=st.none(),
     )
 
 
@@ -101,10 +101,10 @@ def _clearance_strategy() -> st.SearchStrategy[Clearance | None]:
     return st.one_of(st.none(), score_strategy.map(_make))
 
 
-def _weapon_report_strategy() -> st.SearchStrategy[WeaponReport]:
+def _trial_report_strategy() -> st.SearchStrategy[TrialReport]:
     return st.builds(
-        WeaponReport,
-        weapon_id=st.text(min_size=1, max_size=10),
+        TrialReport,
+        trial_id=st.text(min_size=1, max_size=10),
         risk_report=_risk_report_strategy(),
         clearance=_clearance_strategy(),
     )
@@ -142,37 +142,37 @@ def test_confidence_score_deterministic(records: list[IterationRecord]) -> None:
 # ---------------------------------------------------------------------------
 
 
-@given(per_weapon=st.lists(_weapon_report_strategy(), max_size=5))
+@given(per_trial=st.lists(_trial_report_strategy(), max_size=5))
 @settings(max_examples=50)
-def test_aggregate_overall_confidence_bounded(per_weapon: list[WeaponReport]) -> None:
-    final = aggregate_final_clearance(per_weapon, clearance_threshold=0.9)
+def test_aggregate_overall_confidence_bounded(per_trial: list[TrialReport]) -> None:
+    final = aggregate_final_clearance(per_trial, clearance_threshold=0.9)
     assert 0.0 <= final.overall_confidence <= 1.0
 
 
-@given(per_weapon=st.lists(_weapon_report_strategy(), min_size=1, max_size=5))
+@given(per_trial=st.lists(_trial_report_strategy(), min_size=1, max_size=5))
 @settings(max_examples=50)
-def test_any_high_blocks(per_weapon: list[WeaponReport]) -> None:
-    has_high = any(wr.risk_report.risk_level == "high" for wr in per_weapon)
-    final = aggregate_final_clearance(per_weapon, clearance_threshold=0.9)
+def test_any_high_blocks(per_trial: list[TrialReport]) -> None:
+    has_high = any(wr.risk_report.risk_level == "high" for wr in per_trial)
+    final = aggregate_final_clearance(per_trial, clearance_threshold=0.9)
     if has_high:
         assert final.final_recommendation == "block"
 
 
-@given(per_weapon=st.lists(_weapon_report_strategy(), min_size=1, max_size=5))
+@given(per_trial=st.lists(_trial_report_strategy(), min_size=1, max_size=5))
 @settings(max_examples=50)
 def test_pass_requires_no_medium_or_high_and_threshold_met(
-    per_weapon: list[WeaponReport],
+    per_trial: list[TrialReport],
 ) -> None:
-    final = aggregate_final_clearance(per_weapon, clearance_threshold=0.9)
+    final = aggregate_final_clearance(per_trial, clearance_threshold=0.9)
     if final.final_recommendation == "pass":
-        assert all(wr.risk_report.risk_level == "low" for wr in per_weapon)
+        assert all(wr.risk_report.risk_level == "low" for wr in per_trial)
         assert final.overall_confidence >= 0.9
 
 
-def test_empty_per_weapon_blocks() -> None:
+def test_empty_per_trial_blocks() -> None:
     final = aggregate_final_clearance([], clearance_threshold=0.9)
     assert final.final_recommendation == "block"
-    assert final.per_weapon_reports == []
+    assert final.per_trial_reports == []
 
 
 # ---------------------------------------------------------------------------

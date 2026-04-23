@@ -14,7 +14,7 @@ from gauntlet import (
     PlanStep,
     build_risk_report,
 )
-from gauntlet.server import get_weapon, list_weapons
+from gauntlet.server import get_trial, list_trials
 
 from ._factories import make_execution_result
 
@@ -90,8 +90,8 @@ def test_build_risk_report_no_holdout_yields_no_clearance() -> None:
 
 
 @pytest.fixture
-def weapons_dir(tmp_path: Path) -> Path:
-    d = tmp_path / "weapons"
+def trials_dir(tmp_path: Path) -> Path:
+    d = tmp_path / "trials"
     d.mkdir()
     (d / "ownership.yaml").write_text(
         yaml.dump(
@@ -106,8 +106,8 @@ def weapons_dir(tmp_path: Path) -> Path:
     return d
 
 
-def test_list_weapons_omits_blockers(weapons_dir: Path) -> None:
-    briefs = list_weapons(weapons_path=str(weapons_dir))
+def test_list_trials_omits_blockers(trials_dir: Path) -> None:
+    briefs = list_trials(trials_path=str(trials_dir))
     assert len(briefs) == 1
     brief = briefs[0]
     assert brief["id"] == "resource_ownership_write_isolation"
@@ -115,23 +115,23 @@ def test_list_weapons_omits_blockers(weapons_dir: Path) -> None:
     assert "blockers" not in brief  # the attacker view never carries blocker text
 
 
-def test_get_weapon_returns_full_weapon(weapons_dir: Path) -> None:
-    weapon = get_weapon(
-        weapon_id="resource_ownership_write_isolation",
-        weapons_path=str(weapons_dir),
+def test_get_trial_returns_full_trial(trials_dir: Path) -> None:
+    trial = get_trial(
+        trial_id="resource_ownership_write_isolation",
+        trials_path=str(trials_dir),
     )
-    assert weapon.blockers == ["A PATCH by a non-owner is rejected with 403"]
+    assert trial.blockers == ["A PATCH by a non-owner is rejected with 403"]
 
 
-def test_get_weapon_raises_on_unknown_id(weapons_dir: Path) -> None:
-    with pytest.raises(ValueError, match="No weapon"):
-        get_weapon(weapon_id="nonexistent", weapons_path=str(weapons_dir))
+def test_get_trial_raises_on_unknown_id(trials_dir: Path) -> None:
+    with pytest.raises(ValueError, match="No trial"):
+        get_trial(trial_id="nonexistent", trials_path=str(trials_dir))
 
 
-def test_get_weapon_lookup_is_id_only(weapons_dir: Path) -> None:
+def test_get_trial_lookup_is_id_only(trials_dir: Path) -> None:
     """Lookup is id-only; the human-readable title is no longer accepted."""
-    with pytest.raises(ValueError, match="No weapon"):
-        get_weapon(
-            weapon_id="Users cannot modify each other's tasks",
-            weapons_path=str(weapons_dir),
+    with pytest.raises(ValueError, match="No trial"):
+        get_trial(
+            trial_id="Users cannot modify each other's tasks",
+            trials_path=str(trials_dir),
         )

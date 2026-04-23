@@ -12,15 +12,15 @@
 
 Gauntlet is a two-role adversarial MCP server that infers software correctness by observing how code behaves under sustained, targeted attack. It's designed as quality control for a dark-factory environment - where code is written by bots and verified by attack.
 
-**You run your service through the gauntlet.** That's the operating verb: point the host agent at a running service, hand it the weapon set, and the gauntlet is what the service survives (or doesn't). The name comes from "running the gauntlet": a challenge where you must survive a sustained barrage from all sides. Here, the host Claude Code agent drives the system under test through escalating tiers of adversarial pressure until hidden failure modes become detectable — then gates promotion on whether any signal came through.
+**You run your service through the gauntlet.** That's the operating verb: point the host agent at a running service, hand it the trial set, and the gauntlet is what the service survives (or doesn't). The name comes from "running the gauntlet": a challenge where you must survive a sustained barrage from all sides. Here, the host Claude Code agent drives the system under test through escalating tiers of adversarial pressure until hidden failure modes become detectable — then gates promotion on whether any signal came through.
 
-AI-written code can look correct - following conventions, passing linting, reading plausibly - while hiding behavioral failures that only surface under real use. Traditional tests don't catch this because the same agent that wrote the code also wrote the tests, sharing the same blind spots. Gauntlet is built for this: the host's Attacker context assumes the code is broken and generates plans the code author never considered, and the `blockers` in each Weapon are never loaded into that context, preserving a real train/test split that prevents the agent from inadvertently writing code that passes by knowing what the tests check.
+AI-written code can look correct - following conventions, passing linting, reading plausibly - while hiding behavioral failures that only surface under real use. Traditional tests don't catch this because the same agent that wrote the code also wrote the tests, sharing the same blind spots. Gauntlet is built for this: the host's Attacker context assumes the code is broken and generates plans the code author never considered, and the `blockers` in each Trial are never loaded into that context, preserving a real train/test split that prevents the agent from inadvertently writing code that passes by knowing what the tests check.
 
-> An **Attacker** uses a **Weapon** aimed at a **Target** to generate **Plans**. Gauntlet's Drone executes those Plans as a **User**. An **Inspector** watches and surfaces **Findings**. Hidden **Vitals** - externally observable truths about expected system behavior - are checked independently to produce a **Clearance**.
+> An **Attacker** uses a **Trial** aimed at a **Target** to generate **Plans**. Gauntlet's Drone executes those Plans as a **User**. An **Inspector** watches and surfaces **Findings**. Hidden **Vitals** - externally observable truths about expected system behavior - are checked independently to produce a **Clearance**.
 
 ## Operating model
 
-Gauntlet runs **exclusively as an MCP server inside Claude Code**. There is no CLI, no remote CI mode, and no standalone invocation path. The host Claude Code agent plays the Attacker and Inspector roles itself - two prompt contexts it drives in its own loop - and calls Gauntlet's MCP tools for the deterministic pieces: config loading, plan execution against the SUT, weapon assessment, and risk-report assembly.
+Gauntlet runs **exclusively as an MCP server inside Claude Code**. There is no CLI, no remote CI mode, and no standalone invocation path. The host Claude Code agent plays the Attacker and Inspector roles itself - two prompt contexts it drives in its own loop - and calls Gauntlet's MCP tools for the deterministic pieces: config loading, plan execution against the SUT, trial assessment, and risk-report assembly.
 
 Because Gauntlet runs inside a Claude Code session, no Anthropic credentials are needed - the host already has auth.
 
@@ -46,7 +46,7 @@ On first invocation, `uv` auto-resolves the Python dependencies for the MCP serv
 
 - **MCP server `gauntlet`** — the deterministic tools listed below.
 - **Skill `gauntlet`** — auto-loads on trigger phrases ("run gauntlet", "adversarial test", "check before merging") and walks the host through the role-disciplined loop as the Orchestrator.
-- **Skill `gauntlet-author`** — auto-loads on trigger phrases ("author weapons from this spec", "generate gauntlet weapons", "propose weapons for this API") and translates a product spec into Weapon YAMLs in `.gauntlet/weapons/`.
+- **Skill `gauntlet-author`** — auto-loads on trigger phrases ("author trials from this spec", "generate gauntlet trials", "propose trials for this API") and translates a product spec into Trial YAMLs in `.gauntlet/trials/`.
 - **Subagents `gauntlet-attacker`, `gauntlet-inspector`, `gauntlet-holdout-evaluator`** — per-role definitions with MCP-tool allowlists that enforce the train/test split at the permission layer. The Orchestrator dispatches them; they cannot reach the tools their role is forbidden from using.
 
 Without the skill, a host could still call the MCP tools ad-hoc, but it would have to re-derive the loop every time and would be far more likely to collapse the train/test split. The plugin delivery is what makes the four pieces stay in sync.
@@ -55,21 +55,21 @@ Without the skill, a host could still call the MCP tools ad-hoc, but it would ha
 
 | Tool | Purpose | Allowed in role |
 |---|---|---|
-| `list_weapons(weapons_path)` | List attacker-safe weapon views — `{id, title, description}` only, no blockers | Orchestrator, Attacker |
-| `get_weapon(weapon_id, weapons_path)` | Return full weapon including blockers | Orchestrator, HoldoutEvaluator |
+| `list_trials(trials_path)` | List attacker-safe trial views — `{id, title, description}` only, no blockers | Orchestrator, Attacker |
+| `get_trial(trial_id, trials_path)` | Return full trial including blockers | Orchestrator, HoldoutEvaluator |
 | `execute_plan(url, plan, user_headers)` | Deterministically run a `Plan` against the SUT | Orchestrator, Attacker, HoldoutEvaluator |
-| `start_run(weapon_ids)` | Initialize a per-run iteration + holdout buffer; returns an opaque `run_id` | Orchestrator |
-| `record_iteration(run_id, weapon_id, iteration_record)` | Append an `IterationRecord` to the run buffer (rejects findings that carry blocker text) | Attacker, Inspector |
-| `read_iteration_records(run_id, weapon_id)` | Read prior `IterationRecord`s for one weapon in this run | Attacker, Inspector |
-| `record_holdout_result(run_id, weapon_id, holdout_result)` | Append a `HoldoutResult` to the run buffer | HoldoutEvaluator |
-| `read_holdout_results(run_id, weapon_id)` | Read prior `HoldoutResult`s for one weapon in this run | Orchestrator |
-| `assemble_run_report(run_id, weapon_id, clearance_threshold)` | Build per-weapon `RiskReport` + `Clearance`; also persists confirmed-failure findings to the cross-run store as a side effect | Orchestrator |
-| `assemble_final_clearance(run_id, clearance_threshold)` | Aggregate every per-weapon report in the run into one overall `FinalClearance` (pass / conditional / block) | Orchestrator, HoldoutEvaluator |
-| `replay_finding(run_id, weapon_id, finding_index, url, user_headers)` | Re-execute a stored finding's `ReplayBundle` against the SUT; useful for "did the fix actually work" loops | Orchestrator |
-| `mutate_plans(run_id, weapon_id, max_variants)` | Deterministic variants of recorded plans (drop field / rotate users / negate expected / reverse steps) | Orchestrator, Attacker |
-| `recurring_failures(weapon_id, lookback, findings_path)` | Findings that showed up in ≥ 2 of the last N runs for a weapon | Orchestrator |
+| `start_run(trial_ids)` | Initialize a per-run iteration + holdout buffer; returns an opaque `run_id` | Orchestrator |
+| `record_iteration(run_id, trial_id, iteration_record)` | Append an `IterationRecord` to the run buffer (rejects findings that carry blocker text) | Attacker, Inspector |
+| `read_iteration_records(run_id, trial_id)` | Read prior `IterationRecord`s for one trial in this run | Attacker, Inspector |
+| `record_holdout_result(run_id, trial_id, holdout_result)` | Append a `HoldoutResult` to the run buffer | HoldoutEvaluator |
+| `read_holdout_results(run_id, trial_id)` | Read prior `HoldoutResult`s for one trial in this run | Orchestrator |
+| `assemble_run_report(run_id, trial_id, clearance_threshold)` | Build per-trial `RiskReport` + `Clearance`; also persists confirmed-failure findings to the cross-run store as a side effect | Orchestrator |
+| `assemble_final_clearance(run_id, clearance_threshold)` | Aggregate every per-trial report in the run into one overall `FinalClearance` (pass / conditional / block) | Orchestrator, HoldoutEvaluator |
+| `replay_finding(run_id, trial_id, finding_index, url, user_headers)` | Re-execute a stored finding's `ReplayBundle` against the SUT; useful for "did the fix actually work" loops | Orchestrator |
+| `mutate_plans(run_id, trial_id, max_variants)` | Deterministic variants of recorded plans (drop field / rotate users / negate expected / reverse steps) | Orchestrator, Attacker |
+| `recurring_failures(trial_id, lookback, findings_path)` | Findings that showed up in ≥ 2 of the last N runs for a trial | Orchestrator |
 
-The train/test split is enforced at the permission layer via MCP-tool allowlists on each per-role subagent — see the [`agents/`](agents/) directory. The Attacker subagent literally cannot call `get_weapon`, the Inspector subagent cannot call `get_weapon` or read holdout results, and the HoldoutEvaluator subagent cannot read the iteration buffer.
+The train/test split is enforced at the permission layer via MCP-tool allowlists on each per-role subagent — see the [`agents/`](agents/) directory. The Attacker subagent literally cannot call `get_trial`, the Inspector subagent cannot call `get_trial` or read holdout results, and the HoldoutEvaluator subagent cannot read the iteration buffer.
 
 ## Project config directory
 
@@ -78,7 +78,7 @@ Gauntlet reads configuration from a `.gauntlet/` directory at the root of the pr
 ```
 your-project/
 ├── .gauntlet/
-│   └── weapons/           # one YAML file per Weapon
+│   └── trials/           # one YAML file per Trial
 │       ├── task_ownership.yaml
 │       └── task_read_isolation.yaml
 └── ...
@@ -86,12 +86,12 @@ your-project/
 
 Every MCP tool that reads config accepts an override path argument.
 
-### Weapons
+### Trials
 
-A Weapon defines a reusable attack strategy. The `blockers` are the Weapon's **Vitals** - externally observable truths about expected system behavior - never surfaced in the Attacker context, preserving the train/test separation.
+A Trial defines a reusable attack strategy. The `blockers` are the Trial's **Vitals** - externally observable truths about expected system behavior - never surfaced in the Attacker context, preserving the train/test separation.
 
 ```yaml
-# .gauntlet/weapons/task_ownership.yaml
+# .gauntlet/trials/task_ownership.yaml
 title: Users cannot modify each other's tasks
 description: >
   The task API must enforce resource ownership. A user who did not create
@@ -174,7 +174,7 @@ Stateful REST API fuzzer from Microsoft Research. RESTler generates and executes
 
 Shared ground: attacks a **running HTTP server** with **multi-step request sequences**, finds bugs that only manifest through specific request orderings, targets both security and reliability failures.
 
-Architectural divergence: RESTler is a self-contained process - grammar-based generation from the OpenAPI spec, hardcoded validators (status codes, schema conformance), no separation between generator and checker. Gauntlet splits reasoning out into a host agent (which reads the weapon description and invents plans) and keeps execution + report assembly in a deterministic MCP server; there is no internal grammar. RESTler has no train/test split because it has no second reasoning party to withhold invariants from. Output is pass/fail per sequence, not a risk report with a clearance gate.
+Architectural divergence: RESTler is a self-contained process - grammar-based generation from the OpenAPI spec, hardcoded validators (status codes, schema conformance), no separation between generator and checker. Gauntlet splits reasoning out into a host agent (which reads the trial description and invents plans) and keeps execution + report assembly in a deterministic MCP server; there is no internal grammar. RESTler has no train/test split because it has no second reasoning party to withhold invariants from. Output is pass/fail per sequence, not a risk report with a clearance gate.
 
 ### [Schemathesis](https://github.com/schemathesis/schemathesis)
 
@@ -182,7 +182,7 @@ Property-based API testing built on the Hypothesis framework. Generates thousand
 
 Shared ground: tests a **live running API**, supports **stateful multi-step workflows** where earlier requests create resources consumed by later ones, is deliberately **adversarial**.
 
-Architectural divergence: Schemathesis is algorithmic (property-based testing from schema); Gauntlet is agent-driven (plans composed by a host LLM reasoning about a weapon description). The two are complementary - Schemathesis exhausts the schema space, Gauntlet targets specific invariants under adversarial pressure. Schemathesis has no Attacker/Inspector separation, no hidden blockers, no agent to withhold anything from; results are deterministic pass/fail, not a confidence-scored risk report.
+Architectural divergence: Schemathesis is algorithmic (property-based testing from schema); Gauntlet is agent-driven (plans composed by a host LLM reasoning about a trial description). The two are complementary - Schemathesis exhausts the schema space, Gauntlet targets specific invariants under adversarial pressure. Schemathesis has no Attacker/Inspector separation, no hidden blockers, no agent to withhold anything from; results are deterministic pass/fail, not a confidence-scored risk report.
 
 ### [ToolFuzz](https://github.com/eth-sri/ToolFuzz)
 
@@ -190,7 +190,7 @@ LLM-powered fuzzer from ETH Zurich that generates natural-language test prompts 
 
 Shared ground: **uses LLMs to generate adversarial inputs**, has **separate generation and evaluation phases**. Conceptually the closest parallel to Gauntlet's Attacker/Inspector split.
 
-Architectural divergence: ToolFuzz runs its own LLM client end-to-end (its own credentials, its own reasoning), targets LLM agent tools (LangChain, Composio), and has no train/test split - its evaluator sees all the context its generator used. Gauntlet inverts all three: reasoning is delegated to the host Claude Code agent (Gauntlet holds no credentials), the target is an arbitrary HTTP API, and the host-side Skill enforces strict separation between the Attacker context (weapon description only) and the HoldoutEvaluator context (blockers). Gauntlet attacks are multi-step chained API sequences bound by per-weapon hidden invariants; ToolFuzz attacks are single prompts judged semantically.
+Architectural divergence: ToolFuzz runs its own LLM client end-to-end (its own credentials, its own reasoning), targets LLM agent tools (LangChain, Composio), and has no train/test split - its evaluator sees all the context its generator used. Gauntlet inverts all three: reasoning is delegated to the host Claude Code agent (Gauntlet holds no credentials), the target is an arbitrary HTTP API, and the host-side Skill enforces strict separation between the Attacker context (trial description only) and the HoldoutEvaluator context (blockers). Gauntlet attacks are multi-step chained API sequences bound by per-trial hidden invariants; ToolFuzz attacks are single prompts judged semantically.
 
 ### Where Gauntlet sits
 

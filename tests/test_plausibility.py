@@ -235,18 +235,18 @@ def test_record_holdout_result_returns_warnings_for_cross_user_mismatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
 
     holdout = HoldoutResult(
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         blocker_index=0,
         blocker="A non-owner must be rejected with 403",
         execution_result=_execution_result_single_user(),
     )
     result = record_holdout_result(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         holdout_result=holdout,
     )
     assert result["status"] == "ok"
@@ -264,7 +264,7 @@ def test_record_holdout_result_returns_empty_warnings_when_plausible(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
 
     request_a = HttpRequest(method="POST", path="/tasks", body={"title": "x"})
@@ -297,14 +297,14 @@ def test_record_holdout_result_returns_empty_warnings_when_plausible(
         ],
     )
     holdout = HoldoutResult(
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         blocker_index=0,
         blocker="A non-owner's PATCH must be rejected with 403",
         execution_result=execution,
     )
     result = record_holdout_result(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         holdout_result=holdout,
     )
     assert result["status"] == "ok"
@@ -316,18 +316,18 @@ def test_record_holdout_result_without_blocker_has_no_warnings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
 
     # HoldoutResult may carry no blocker text; plausibility has nothing to
     # check against, so warnings must be empty.
     holdout = HoldoutResult(
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         execution_result=_execution_result_single_user(),
     )
     result = record_holdout_result(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         holdout_result=holdout,
     )
     assert result == {"status": "ok", "warnings": []}

@@ -12,7 +12,7 @@ Gauntlet runs **exclusively as an MCP server inside Claude Code**. There is no C
 
 ## Docs
 
-- [Scope](SCOPE.md) - public API surface, internals, non-goals. Read before adding anything to the MCP tool surface, the subagent allowlists, the skill triggers, or the Weapon schema.
+- [Scope](SCOPE.md) - public API surface, internals, non-goals. Read before adding anything to the MCP tool surface, the subagent allowlists, the skill triggers, or the Trial schema.
 - [Architecture](docs/architecture.md) - module map, MCP tool surface, train/test split, design decisions
 - [Development](docs/development.md) - setup, tests, linting, Docker, CI
 - [Usage](docs/usage.md) - host runbook: the driven loop, interpreting results
@@ -23,7 +23,7 @@ Sync `docs/architecture.md` with the current module structure in `gauntlet/`. Ch
 
 ## Scope discipline
 
-Before adding, removing, or renaming anything on Gauntlet's public surface (MCP tools, subagent allowlists, skill triggers, Weapon YAML fields), check [SCOPE.md](SCOPE.md). If the change would land under "Non-goals", surface it to the user instead of doing it. Internal refactors don't need this check.
+Before adding, removing, or renaming anything on Gauntlet's public surface (MCP tools, subagent allowlists, skill triggers, Trial YAML fields), check [SCOPE.md](SCOPE.md). If the change would land under "Non-goals", surface it to the user instead of doing it. Internal refactors don't need this check.
 
 ## Approved commands
 

@@ -126,7 +126,7 @@ def log_tool_call(tool: str, **extras: Any) -> Iterator[None]:
     On successful exit, logs ``status="ok"`` plus ``duration_ms``. On
     exception, logs ``status="error"`` with ``exc_type`` and ``exc_msg``, then
     re-raises. Any keyword arguments bound at entry (e.g. ``run_id``,
-    ``weapon_id``) are included on the log line.
+    ``trial_id``) are included on the log line.
     """
     logger = logging.getLogger("gauntlet.tool")
     start = time.perf_counter()

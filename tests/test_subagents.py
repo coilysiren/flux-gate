@@ -16,14 +16,14 @@ import yaml
 AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
 
 ATTACKER_ALLOW = {
-    "mcp__gauntlet__list_weapons",
+    "mcp__gauntlet__list_trials",
     "mcp__gauntlet__execute_plan",
     "mcp__gauntlet__read_iteration_records",
     "mcp__gauntlet__record_iteration",
     "mcp__gauntlet__mutate_plans",
 }
 ATTACKER_FORBID = {
-    "mcp__gauntlet__get_weapon",
+    "mcp__gauntlet__get_trial",
     "mcp__gauntlet__read_holdout_results",
     "mcp__gauntlet__record_holdout_result",
     "mcp__gauntlet__assemble_final_clearance",
@@ -34,7 +34,7 @@ INSPECTOR_ALLOW = {
     "mcp__gauntlet__record_iteration",
 }
 INSPECTOR_FORBID = {
-    "mcp__gauntlet__get_weapon",
+    "mcp__gauntlet__get_trial",
     "mcp__gauntlet__execute_plan",
     "mcp__gauntlet__read_holdout_results",
     "mcp__gauntlet__record_holdout_result",
@@ -42,7 +42,7 @@ INSPECTOR_FORBID = {
 }
 
 HOLDOUT_ALLOW = {
-    "mcp__gauntlet__get_weapon",
+    "mcp__gauntlet__get_trial",
     "mcp__gauntlet__execute_plan",
     "mcp__gauntlet__record_holdout_result",
     "mcp__gauntlet__assemble_final_clearance",
@@ -50,7 +50,7 @@ HOLDOUT_ALLOW = {
 HOLDOUT_FORBID = {
     "mcp__gauntlet__read_iteration_records",
     "mcp__gauntlet__record_iteration",
-    "mcp__gauntlet__list_weapons",
+    "mcp__gauntlet__list_trials",
 }
 
 

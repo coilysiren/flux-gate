@@ -1,17 +1,17 @@
 ---
 name: gauntlet-author
-description: Author Gauntlet Weapon YAMLs from a product spec. Use this skill when the user wants to translate a verbose product specification, design doc, or natural-language description of an HTTP service into testable invariants packaged as Gauntlet Weapons. Triggers include "author weapons from this spec", "generate gauntlet weapons", "propose weapons for this API", "make weapons from this design doc", "what should we test about this service".
+description: Author Gauntlet Trial YAMLs from a product spec. Use this skill when the user wants to translate a verbose product specification, design doc, or natural-language description of an HTTP service into testable invariants packaged as Gauntlet Trials. Triggers include "author trials from this spec", "generate gauntlet trials", "propose trials for this API", "make trials from this design doc", "what should we test about this service".
 ---
 
 # Gauntlet Author
 
-This skill takes a product spec — markdown, plain text, or a path to one — and produces a `.gauntlet/weapons/` directory of Weapon YAMLs ready to feed the Gauntlet hardening loop. The skill is the translation layer between "what the system is supposed to do" (a human-authored spec) and "what externally observable invariants we will check" (Gauntlet Weapons).
+This skill takes a product spec — markdown, plain text, or a path to one — and produces a `.gauntlet/trials/` directory of Trial YAMLs ready to feed the Gauntlet hardening loop. The skill is the translation layer between "what the system is supposed to do" (a human-authored spec) and "what externally observable invariants we will check" (Gauntlet Trials).
 
-You are reasoning about *invariants*, not endpoints. The Weapon describes the property that must hold; the host's Attacker subagent will figure out how to exercise the API surface.
+You are reasoning about *invariants*, not endpoints. The Trial describes the property that must hold; the host's Attacker subagent will figure out how to exercise the API surface.
 
-## Critical: Weapons own the train/test split
+## Critical: Trials own the train/test split
 
-Each Weapon has two halves:
+Each Trial has two halves:
 
 - `description` — the attack surface, given to the Attacker. Phrased as "the API enforces X." The Attacker uses this to compose probes.
 - `blockers` — the falsifiable acceptance criteria, withheld from the Attacker and given only to the HoldoutEvaluator. Phrased as "A request that does X is rejected with status 403."
@@ -54,13 +54,13 @@ Common invariant categories — use this as a checklist, not a script:
 
 If the spec mentions a specific failure mode ("must reject malformed JSON with 400"), that is a blocker, not an invariant on its own — fold it into the relevant category.
 
-If you find five candidate invariants, prefer five over fifty. Each weapon adds 4+ iteration cycles of cost. A small, sharp arsenal that surfaces the first wave of regressions is more valuable than a sprawling one that exhausts the budget on shallow checks.
+If you find five candidate invariants, prefer five over fifty. Each trial adds 4+ iteration cycles of cost. A small, sharp arsenal that surfaces the first wave of regressions is more valuable than a sprawling one that exhausts the budget on shallow checks.
 
-### Step 3 — Write each Weapon as YAML
+### Step 3 — Write each Trial as YAML
 
-Authoring location: `.gauntlet/weapons/<slug>.yaml`. One file per weapon. Slug is snake_case derived from the invariant.
+Authoring location: `.gauntlet/trials/<slug>.yaml`. One file per trial. Slug is snake_case derived from the invariant.
 
-Required fields, per the `Weapon` Pydantic model in [`gauntlet/models.py`](../../gauntlet/models.py):
+Required fields, per the `Trial` Pydantic model in [`gauntlet/models.py`](../../gauntlet/models.py):
 
 ```yaml
 id: resource_ownership_write_isolation     # snake_case, stable across runs
@@ -84,7 +84,7 @@ Authoring rules:
 - Each `blocker` is a single falsifiable statement with an expected status code where applicable. "Returns 403" is testable; "is secure" is not.
 - Do **not** include sample requests or expected responses in the YAML. That is the Attacker's job to compose at run time.
 
-Self-checks before saving each weapon:
+Self-checks before saving each trial:
 
 - A blocker shorter than ~20 chars is too vague; add the expected behaviour.
 - No HTTP status codes anywhere in the blockers usually means you're describing intent ("auth check happens") instead of behaviour ("returns 403").
@@ -93,21 +93,21 @@ Self-checks before saving each weapon:
 
 Return to the user (or orchestrator):
 
-- Number of weapons authored.
-- One-line summary per weapon (id + title).
+- Number of trials authored.
+- One-line summary per trial (id + title).
 - Suggested next steps: run the gauntlet skill.
 
 ## What this skill does not do
 
 - It does not run the adversarial loop. Authoring and running are separate concerns; the host composes them.
-- It does not score the authored weapons for coverage. (That's a future feature; for now, human review.)
+- It does not score the authored trials for coverage. (That's a future feature; for now, human review.)
 - It does not invoke any LLM other than itself — no API calls, no separate Anthropic/OpenAI clients.
-- It does not modify weapons that already exist in `.gauntlet/weapons/`. If a weapon with the same id is already there, surface the conflict and let the user decide; don't overwrite.
+- It does not modify trials that already exist in `.gauntlet/trials/`. If a trial with the same id is already there, surface the conflict and let the user decide; don't overwrite.
 
 ## Common mistakes to avoid
 
 - **Description leaks blockers.** "The API rejects non-owner PATCH with 403" in the description means the Attacker reads the blocker for free. Re-write the description to "The API enforces resource ownership on writes."
 - **Blocker is implementation, not behaviour.** "Goes through the auth middleware" is not externally observable; "returns 403" is.
-- **One weapon per endpoint instead of per invariant.** If "POST /tasks" and "POST /projects" both need the same auth check, that's *one* weapon describing the invariant ("Writes require authentication"), not two.
-- **Authoring fifty weapons from a five-page spec.** Start with the five sharpest invariants. The user can ask for more if those land.
-- **Editing existing weapons mid-run.** Each weapon's blockers anchor the holdout. If they churn, the holdout is no longer a holdout.
+- **One trial per endpoint instead of per invariant.** If "POST /tasks" and "POST /projects" both need the same auth check, that's *one* trial describing the invariant ("Writes require authentication"), not two.
+- **Authoring fifty trials from a five-page spec.** Start with the five sharpest invariants. The user can ask for more if those land.
+- **Editing existing trials mid-run.** Each trial's blockers anchor the holdout. If they churn, the holdout is no longer a holdout.

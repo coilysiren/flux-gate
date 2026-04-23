@@ -15,7 +15,7 @@ from .models import (
     ResponseCollision,
     RiskReport,
     TimingAnomaly,
-    WeaponReport,
+    TrialReport,
 )
 
 
@@ -27,7 +27,7 @@ def build_risk_report(
     """Assemble a ``RiskReport`` and optional ``Clearance`` from iteration records.
 
     ``records`` is the full per-iteration log the host has accumulated.
-    ``holdout_results`` are the execution results of the weapon's acceptance
+    ``holdout_results`` are the execution results of the trial's acceptance
     plans (the withheld vitals). When ``holdout_results`` is empty, the
     returned clearance is ``None`` — there's no gate to evaluate.
     """
@@ -153,32 +153,32 @@ _RISK_RANK: dict[str, int] = {"low": 0, "medium": 1, "high": 2}
 
 
 def aggregate_final_clearance(
-    per_weapon: list[WeaponReport], clearance_threshold: float
+    per_trial: list[TrialReport], clearance_threshold: float
 ) -> FinalClearance:
-    """Aggregate per-weapon reports into one overall pass/fail decision.
+    """Aggregate per-trial reports into one overall pass/fail decision.
 
     Used by the ``assemble_final_clearance`` MCP tool. See
     :class:`FinalClearance` for the aggregation rules.
     """
-    if not per_weapon:
+    if not per_trial:
         return FinalClearance(
             overall_confidence=0.0,
             max_risk_level="low",
             all_confirmed_failures=[],
             final_recommendation="block",
-            rationale="No weapons were run; nothing can be cleared.",
+            rationale="No trials were run; nothing can be cleared.",
             clearance_threshold=clearance_threshold,
-            per_weapon_reports=[],
+            per_trial_reports=[],
         )
 
     confidence_signals: list[float] = []
-    for wr in per_weapon:
+    for wr in per_trial:
         confidence_signals.append(wr.risk_report.confidence_score)
         if wr.clearance is not None:
             confidence_signals.append(wr.clearance.holdout_satisfaction_score)
     overall_confidence = round(min(confidence_signals), 4)
 
-    max_risk_rank = max(_RISK_RANK[wr.risk_report.risk_level] for wr in per_weapon)
+    max_risk_rank = max(_RISK_RANK[wr.risk_report.risk_level] for wr in per_trial)
     max_risk_level: Literal["low", "medium", "high"]
     if max_risk_rank == _RISK_RANK["high"]:
         max_risk_level = "high"
@@ -188,11 +188,11 @@ def aggregate_final_clearance(
         max_risk_level = "low"
 
     all_confirmed_failures = sorted(
-        {failure for wr in per_weapon for failure in wr.risk_report.confirmed_failures}
+        {failure for wr in per_trial for failure in wr.risk_report.confirmed_failures}
     )
 
     has_high = max_risk_rank == _RISK_RANK["high"]
-    has_medium = any(wr.risk_report.risk_level == "medium" for wr in per_weapon)
+    has_medium = any(wr.risk_report.risk_level == "medium" for wr in per_trial)
     threshold_met = overall_confidence >= clearance_threshold
 
     final_recommendation: Literal["pass", "conditional", "block"]
@@ -206,13 +206,13 @@ def aggregate_final_clearance(
         final_recommendation = "conditional"
         rationale = (
             f"Overall confidence {overall_confidence:.0%} meets threshold "
-            f"{clearance_threshold:.0%} but at least one weapon surfaced "
+            f"{clearance_threshold:.0%} but at least one trial surfaced "
             f"medium-severity findings — human review recommended."
         )
     else:
         final_recommendation = "block"
         if has_high:
-            rationale = "At least one weapon surfaced high-severity findings; promotion is blocked."
+            rationale = "At least one trial surfaced high-severity findings; promotion is blocked."
         else:
             rationale = (
                 f"Overall confidence {overall_confidence:.0%} is below threshold "
@@ -226,7 +226,7 @@ def aggregate_final_clearance(
         final_recommendation=final_recommendation,
         rationale=rationale,
         clearance_threshold=clearance_threshold,
-        per_weapon_reports=per_weapon,
+        per_trial_reports=per_trial,
     )
 
 

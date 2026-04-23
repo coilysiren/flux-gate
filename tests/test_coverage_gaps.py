@@ -26,7 +26,7 @@ from gauntlet import (
     IterationSpec,
     Plan,
     PlanStep,
-    Weapon,
+    Trial,
     build_risk_report,
 )
 from gauntlet._log import _JsonFormatter, configure_logging, log_tool_call
@@ -39,7 +39,7 @@ from gauntlet.loop import (
     _timing_anomalies,
 )
 from gauntlet.models import AssertionResult
-from gauntlet.server import _load_weapons
+from gauntlet.server import _load_trials
 
 # ---------------------------------------------------------------------------
 # _log.py — non-JSON-serializable extras and exception payloads
@@ -238,29 +238,29 @@ def test_build_clearance_conditional_recommendation() -> None:
 
 
 # ---------------------------------------------------------------------------
-# server._load_weapons — single-file path (not a directory)
+# server._load_trials — single-file path (not a directory)
 # ---------------------------------------------------------------------------
 
 
-def test_load_weapons_from_single_file(tmp_path: Path) -> None:
+def test_load_trials_from_single_file(tmp_path: Path) -> None:
     path = tmp_path / "one.yaml"
     path.write_text(
         yaml.dump(
             {
-                "id": "single_weapon",
+                "id": "single_trial",
                 "title": "Single",
                 "description": "d",
                 "blockers": ["b"],
             }
         )
     )
-    weapons = _load_weapons(str(path))
-    assert len(weapons) == 1
-    assert weapons[0].id == "single_weapon"
+    trials = _load_trials(str(path))
+    assert len(trials) == 1
+    assert trials[0].id == "single_trial"
 
 
-def test_load_weapons_missing_path_returns_empty(tmp_path: Path) -> None:
-    assert _load_weapons(str(tmp_path / "does-not-exist")) == []
+def test_load_trials_missing_path_returns_empty(tmp_path: Path) -> None:
+    assert _load_trials(str(tmp_path / "does-not-exist")) == []
 
 
 # ---------------------------------------------------------------------------
@@ -335,9 +335,9 @@ def test_classify_other_error_fallback() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_weapon_id_rejects_non_snake_case() -> None:
+def test_trial_id_rejects_non_snake_case() -> None:
     with pytest.raises(ValueError, match="snake_case"):
-        Weapon(id="NotSnake", title="t", description="d", blockers=["b"])
+        Trial(id="NotSnake", title="t", description="d", blockers=["b"])
 
 
 def test_execution_result_empty_assertions_is_perfect_score() -> None:

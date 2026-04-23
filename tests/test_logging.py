@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from gauntlet._log import configure_logging, log_tool_call
-from gauntlet.server import list_weapons
+from gauntlet.server import list_trials
 
 
 @pytest.fixture()
@@ -47,19 +47,19 @@ def _parse_tool_lines(stream: io.StringIO, tool: str) -> list[dict[str, object]]
     return [json.loads(line) for line in lines if f'"tool": "{tool}"' in line]
 
 
-def test_list_weapons_emits_structured_log_line(
+def test_list_trials_emits_structured_log_line(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     json_log_stream: io.StringIO,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    result = list_weapons(weapons_path=str(tmp_path / "missing"))
+    result = list_trials(trials_path=str(tmp_path / "missing"))
     assert result == []
 
-    entries = _parse_tool_lines(json_log_stream, "list_weapons")
-    assert entries, "expected at least one log entry for list_weapons"
+    entries = _parse_tool_lines(json_log_stream, "list_trials")
+    assert entries, "expected at least one log entry for list_trials"
     entry = entries[-1]
-    assert entry["tool"] == "list_weapons"
+    assert entry["tool"] == "list_trials"
     assert entry["status"] == "ok"
     duration = entry["duration_ms"]
     assert isinstance(duration, int | float)
@@ -74,7 +74,7 @@ def test_log_tool_call_captures_extras_and_reraises_errors(
     json_log_stream: io.StringIO,
 ) -> None:
     with pytest.raises(RuntimeError, match="boom"):
-        with log_tool_call("demo_tool", run_id="r1", weapon_id="w1"):
+        with log_tool_call("demo_tool", run_id="r1", trial_id="w1"):
             raise RuntimeError("boom")
 
     entries = _parse_tool_lines(json_log_stream, "demo_tool")
@@ -84,7 +84,7 @@ def test_log_tool_call_captures_extras_and_reraises_errors(
     assert entry["exc_type"] == "RuntimeError"
     assert entry["exc_msg"] == "boom"
     assert entry["run_id"] == "r1"
-    assert entry["weapon_id"] == "w1"
+    assert entry["trial_id"] == "w1"
     assert entry["level"] == "ERROR"
 
 

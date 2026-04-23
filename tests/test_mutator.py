@@ -179,7 +179,7 @@ def test_mutate_plans_mcp_tool_sees_recorded_plans(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
 
     record = IterationRecord(
@@ -188,11 +188,11 @@ def test_mutate_plans_mcp_tool_sees_recorded_plans(
         execution_results=[],
         findings=[],
     )
-    record_iteration(run_id=run_id, weapon_id="weapon_a", iteration_record=record)
+    record_iteration(run_id=run_id, trial_id="trial_a", iteration_record=record)
 
     variants = mutate_plans_tool(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         max_variants=4,
     )
     assert len(variants) == 4
@@ -202,15 +202,15 @@ def test_mutate_plans_mcp_tool_sees_recorded_plans(
     assert all(v.name.startswith(_rich_plan().name + ":mut-") for v in variants)
 
 
-def test_mutate_plans_mcp_tool_returns_empty_for_weapon_with_no_plans(
+def test_mutate_plans_mcp_tool_returns_empty_for_trial_with_no_plans(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
     variants = mutate_plans_tool(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         max_variants=4,
     )
     assert variants == []
@@ -221,13 +221,13 @@ def test_mutate_plans_mcp_tool_dedupes_by_name(
 ) -> None:
     """Plans with the same name across iterations are only mutated once."""
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
     # Record the same plan twice across two iterations.
     for _ in range(2):
         record_iteration(
             run_id=run_id,
-            weapon_id="weapon_a",
+            trial_id="trial_a",
             iteration_record=IterationRecord(
                 spec=_spec(),
                 plans=[_rich_plan()],
@@ -237,7 +237,7 @@ def test_mutate_plans_mcp_tool_dedupes_by_name(
         )
     variants = mutate_plans_tool(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         max_variants=4,
     )
     # One seed plan → four strategies → at most 4 variants, not 8.

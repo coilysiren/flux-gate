@@ -13,7 +13,7 @@ from gauntlet import (
     Plan,
     PlanStep,
     RiskReport,
-    WeaponReport,
+    TrialReport,
     aggregate_final_clearance,
 )
 from gauntlet.server import (
@@ -36,13 +36,13 @@ def _spec(name: str = "baseline") -> IterationSpec:
 
 
 def _wr(
-    weapon_id: str,
+    trial_id: str,
     *,
     confidence: float,
     risk_level: str = "low",
     confirmed: list[str] | None = None,
     holdout_score: float | None = None,
-) -> WeaponReport:
+) -> TrialReport:
     report = RiskReport(
         confidence_score=confidence,
         risk_level=risk_level,  # type: ignore[arg-type]
@@ -65,7 +65,7 @@ def _wr(
         )
     else:
         clearance = None
-    return WeaponReport(weapon_id=weapon_id, risk_report=report, clearance=clearance)
+    return TrialReport(trial_id=trial_id, risk_report=report, clearance=clearance)
 
 
 def test_pass_when_high_confidence_and_low_risk_only() -> None:
@@ -132,7 +132,7 @@ def test_block_when_below_threshold_even_with_low_risk() -> None:
 def test_empty_run_blocks() -> None:
     final = aggregate_final_clearance([], clearance_threshold=0.9)
     assert final.final_recommendation == "block"
-    assert final.per_weapon_reports == []
+    assert final.per_trial_reports == []
 
 
 def test_overall_confidence_is_weakest_link() -> None:
@@ -175,7 +175,7 @@ _AUTHZ_PLAN = Plan(
 )
 
 
-def _seed_weapon(run_id: str, weapon_id: str) -> None:
+def _seed_trial(run_id: str, trial_id: str) -> None:
     execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     record = IterationRecord(
         spec=_spec(),
@@ -183,25 +183,25 @@ def _seed_weapon(run_id: str, weapon_id: str) -> None:
         execution_results=[execution],
         findings=[],
     )
-    record_iteration(run_id=run_id, weapon_id=weapon_id, iteration_record=record)
+    record_iteration(run_id=run_id, trial_id=trial_id, iteration_record=record)
     record_holdout_result(
         run_id=run_id,
-        weapon_id=weapon_id,
-        holdout_result=HoldoutResult(weapon_id=weapon_id, execution_result=execution),
+        trial_id=trial_id,
+        holdout_result=HoldoutResult(trial_id=trial_id, execution_result=execution),
     )
 
 
 def test_assemble_final_clearance_via_mcp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a", "weapon_b"])
+    out = start_run(trial_ids=["trial_a", "trial_b"])
     run_id = out["run_id"]
-    _seed_weapon(run_id, "weapon_a")
-    _seed_weapon(run_id, "weapon_b")
+    _seed_trial(run_id, "trial_a")
+    _seed_trial(run_id, "trial_b")
 
     final = assemble_final_clearance(run_id=run_id, clearance_threshold=0.9)
 
-    assert len(final.per_weapon_reports) == 2
-    assert {wr.weapon_id for wr in final.per_weapon_reports} == {"weapon_a", "weapon_b"}
+    assert len(final.per_trial_reports) == 2
+    assert {wr.trial_id for wr in final.per_trial_reports} == {"trial_a", "trial_b"}
     # _AUTHZ_PLAN has no assertions so satisfaction_score=1.0; reports should pass
     # the holdout but the iterations have no findings so risk_level stays low.
     assert final.max_risk_level == "low"
@@ -209,17 +209,17 @@ def test_assemble_final_clearance_via_mcp(tmp_path: Path, monkeypatch: pytest.Mo
 
 def test_assemble_final_clearance_subset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a", "weapon_b"])
+    out = start_run(trial_ids=["trial_a", "trial_b"])
     run_id = out["run_id"]
-    _seed_weapon(run_id, "weapon_a")
+    _seed_trial(run_id, "trial_a")
 
     final = assemble_final_clearance(
         run_id=run_id,
         clearance_threshold=0.9,
-        weapon_ids=["weapon_a"],
+        trial_ids=["trial_a"],
     )
-    assert len(final.per_weapon_reports) == 1
-    assert final.per_weapon_reports[0].weapon_id == "weapon_a"
+    assert len(final.per_trial_reports) == 1
+    assert final.per_trial_reports[0].trial_id == "trial_a"
 
 
 def test_assemble_final_clearance_unknown_run_raises(

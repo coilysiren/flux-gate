@@ -52,7 +52,7 @@ claude plugin install /absolute/path/to/gauntlet
 Files the plugin system reads:
 - `.claude-plugin/plugin.json` - manifest (MCP server declaration, metadata)
 - `skills/gauntlet/SKILL.md` - the Orchestrator skill (auto-discovered by trigger phrase)
-- `skills/gauntlet-author/SKILL.md` - the weapon-authoring skill (auto-discovered by trigger phrase)
+- `skills/gauntlet-author/SKILL.md` - the trial-authoring skill (auto-discovered by trigger phrase)
 - `agents/gauntlet-attacker.md`, `agents/gauntlet-inspector.md`, `agents/gauntlet-holdout-evaluator.md` - per-role subagent definitions with MCP-tool allowlists
 
 All paths are load-bearing. Moving any of them breaks the plugin; update `plugin.json` if you relocate a file.

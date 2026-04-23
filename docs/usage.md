@@ -6,7 +6,7 @@ Workflow guide for a host Claude Code agent driving the Gauntlet MCP server. For
 
 - Gauntlet installed and registered as an MCP server in the Claude Code project. See [README - Install](../README.md#install).
 - A running SUT (URL the host can reach).
-- A `.gauntlet/` directory at the project root with at least one weapon YAML.
+- A `.gauntlet/` directory at the project root with at least one trial YAML.
 
 No Anthropic or OpenAI credentials are needed. Gauntlet never calls an LLM itself; the host already has auth.
 
@@ -20,27 +20,27 @@ Place the invocation as the final checkpoint in the host's pipeline.
 
 Gauntlet exposes 13 MCP tools (see the [README](../README.md#mcp-tools) for the full table). The host drives them in roughly this order:
 
-1. **Orchestrator**: pick weapons, start the run.
+1. **Orchestrator**: pick trials, start the run.
    ```
-   list_weapons()                 → list[dict]   # {id, title, description}
-   start_run(weapon_ids=[...])    → {run_id}
+   list_trials()                 → list[dict]   # {id, title, description}
+   start_run(trial_ids=[...])    → {run_id}
    ```
 
 2. **Per iteration** (typically four - baseline → boundary → adversarial_misuse → targeted_escalation), with per-role subagents appending to the run buffer via `record_iteration` / `read_iteration_records`:
-   - **Attacker context** (reads the attacker view of the weapon — `{id, title, description}` only): compose one or more `Plan`s targeting the weapon's surface, drawing on prior iteration results.
+   - **Attacker context** (reads the attacker view of the trial — `{id, title, description}` only): compose one or more `Plan`s targeting the trial's surface, drawing on prior iteration results.
    - **Drone** (via MCP): `execute_plan(url, plan, user_headers)` → `ExecutionResult`. Repeat per plan.
    - **Inspector context** (reads `ExecutionResult`s, not blockers): produce `Finding`s. Optionally mark some as `is_anomaly=True`.
    - Append an `IterationRecord` bundling the spec, plans, results, and findings.
 
-3. **HoldoutEvaluator context** (reads full `Weapon` including `blockers`, appends via `record_holdout_result`):
+3. **HoldoutEvaluator context** (reads full `Trial` including `blockers`, appends via `record_holdout_result`):
    ```
-   get_weapon(id) → Weapon
+   get_trial(id) → Trial
    ```
    Derive acceptance plans from each blocker - one structured `Plan` per blocker. Execute each with `execute_plan` and record the outcome.
 
 4. **Orchestrator**:
    ```
-   assemble_run_report(run_id, weapon_id, clearance_threshold=0.9)
+   assemble_run_report(run_id, trial_id, clearance_threshold=0.9)
    → { risk_report, clearance }
    assemble_final_clearance(run_id, clearance_threshold=0.9)
    → FinalClearance
@@ -50,12 +50,12 @@ Optional Orchestrator-side tools round out the loop: `mutate_plans` (determinist
 
 The train/test split is enforced at the permission layer via the per-role subagents' MCP-tool allowlists, plus at the buffer boundary by `record_iteration` (which rejects findings carrying blocker text).
 
-## Writing weapons
+## Writing trials
 
-Weapons define attack strategies reusable across API surfaces. Each is a YAML file in `.gauntlet/weapons/`.
+Trials define attack strategies reusable across API surfaces. Each is a YAML file in `.gauntlet/trials/`.
 
 ```yaml
-# .gauntlet/weapons/task_ownership.yaml
+# .gauntlet/trials/task_ownership.yaml
 title: Users cannot modify each other's tasks
 description: >
   The task API must enforce resource ownership. A user who did not create
@@ -66,10 +66,10 @@ blockers:
   - A GET by the owner after an unauthorized PATCH returns the original data
 ```
 
-**The train/test split:** `blockers` are not surfaced by `list_weapons`. Only `get_weapon` returns them, and the host must only read `get_weapon` output in its HoldoutEvaluator context. If blocker text appears in an Attacker-role prompt, the split is broken and the run is invalid.
+**The train/test split:** `blockers` are not surfaced by `list_trials`. Only `get_trial` returns them, and the host must only read `get_trial` output in its HoldoutEvaluator context. If blocker text appears in an Attacker-role prompt, the split is broken and the run is invalid.
 
 Tips:
-- One weapon per file, named for the property it protects (e.g. `task_ownership.yaml`).
+- One trial per file, named for the property it protects (e.g. `task_ownership.yaml`).
 - Write blockers as falsifiable statements about what the system does, not how.
 
 ## User authentication

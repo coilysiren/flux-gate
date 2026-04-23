@@ -50,7 +50,7 @@ class Plan(GauntletModel):
     goal: str
     steps: list[PlanStep]
     assertions: list[Assertion] = Field(default_factory=list)
-    weapon_id: str | None = None
+    trial_id: str | None = None
 
 
 class ExecutionStepResult(GauntletModel):
@@ -142,7 +142,7 @@ class Finding(GauntletModel):
     severity: Literal["low", "medium", "high"]
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str
-    weapon_id: str | None = None
+    trial_id: str | None = None
     next_targets: list[str] = Field(default_factory=list)
     evidence: list[EvidenceItem] = Field(default_factory=list)
     reproduction_steps: list[str] = Field(default_factory=list)
@@ -152,19 +152,19 @@ class Finding(GauntletModel):
     is_anomaly: bool = False
 
 
-class Weapon(GauntletModel):
-    """Engineer-authored weapon that drives the adversarial loop.
+class Trial(GauntletModel):
+    """Engineer-authored trial that drives the adversarial loop.
 
     ``id`` is a stable snake_case identifier (e.g.
     ``resource_ownership_write_isolation``) used to accumulate failure
     knowledge across runs.  ``title`` is the human-readable alias.
 
     ``description`` is given to the Attacker to guide probe plan generation.
-    ``blockers`` are the Weapon's Vitals — externally observable truths
+    ``blockers`` are the Trial's Vitals — externally observable truths
     about expected system behavior — given only to the HoldoutEvaluator.
     The Attacker never receives them, preserving the train/test separation.
 
-    Use ``Weapon.attacker_view()`` to produce the dict that ``list_weapons``
+    Use ``Trial.attacker_view()`` to produce the dict that ``list_trials``
     returns to attacker contexts.
     """
 
@@ -181,20 +181,20 @@ class Weapon(GauntletModel):
     def _validate_id(cls, value: str | None) -> str | None:
         if value is not None and not cls._SNAKE_CASE_RE.match(value):
             raise ValueError(
-                f"Weapon id must be non-empty snake_case "
+                f"Trial id must be non-empty snake_case "
                 f"(e.g. 'resource_ownership_write_isolation'), got {value!r}"
             )
         return value
 
     def attacker_view(self) -> dict[str, str | None]:
-        """Return the attacker-safe view of this weapon (no blockers)."""
+        """Return the attacker-safe view of this trial (no blockers)."""
         return {"id": self.id, "title": self.title, "description": self.description}
 
 
 class Target(GauntletModel):
-    """Engineer-specified API surface to test a Weapon against.
+    """Engineer-specified API surface to test a Trial against.
 
-    ``endpoints`` lists the HTTP method+path pairs the weapon's plans
+    ``endpoints`` lists the HTTP method+path pairs the trial's plans
     should exercise (e.g. ``"PATCH /tasks/{id}"``). Additional configuration
     fields will be added here as the model grows.
     """
@@ -217,16 +217,16 @@ class IterationRecord(GauntletModel):
 
 
 class HoldoutResult(GauntletModel):
-    """Result of executing one acceptance plan derived from a Weapon's blockers.
+    """Result of executing one acceptance plan derived from a Trial's blockers.
 
     Captured by the HoldoutEvaluator after running a structured ``Plan`` that
-    tests one of the weapon's blockers. The orchestrator reads these via
+    tests one of the trial's blockers. The orchestrator reads these via
     ``read_holdout_results`` to assemble the final clearance gate. Inspector
     and Attacker contexts must never read holdout results — doing so leaks
     blocker semantics back across the train/test split.
     """
 
-    weapon_id: str
+    trial_id: str
     blocker_index: int | None = None
     blocker: str | None = None
     execution_result: ExecutionResult
@@ -300,36 +300,36 @@ class RiskReport(GauntletModel):
     timing_anomalies: list[TimingAnomaly] = Field(default_factory=list)
 
 
-class WeaponReport(GauntletModel):
-    """One weapon's contribution to a multi-weapon `FinalClearance`.
+class TrialReport(GauntletModel):
+    """One trial's contribution to a multi-trial `FinalClearance`.
 
-    Carries the per-weapon `RiskReport` and `Clearance` plus the weapon id
+    Carries the per-trial `RiskReport` and `Clearance` plus the trial id
     so the orchestrator can correlate results back to the run buffer.
     """
 
-    weapon_id: str
+    trial_id: str
     risk_report: RiskReport
     clearance: Clearance | None = None
 
 
 class FinalClearance(GauntletModel):
-    """Aggregated clearance across every weapon in a run.
+    """Aggregated clearance across every trial in a run.
 
     Produced by ``assemble_final_clearance``. The host treats
-    ``final_recommendation`` as its overall pass/fail decision; the per-weapon
+    ``final_recommendation`` as its overall pass/fail decision; the per-trial
     reports are kept inline so a failed run can be unpacked without a second
     round-trip to the buffer.
 
     Aggregation rules (defaults — override in the docstring of the tool that
     constructs this if you change them):
 
-    - ``overall_confidence`` — minimum of per-weapon ``risk_report.confidence_score``
-      and per-weapon ``clearance.holdout_satisfaction_score`` (weakest link
-      dominates). Weapons without a holdout still count their confidence score.
-    - ``max_risk_level`` — highest severity across all per-weapon risk levels.
+    - ``overall_confidence`` — minimum of per-trial ``risk_report.confidence_score``
+      and per-trial ``clearance.holdout_satisfaction_score`` (weakest link
+      dominates). Trials without a holdout still count their confidence score.
+    - ``max_risk_level`` — highest severity across all per-trial risk levels.
     - ``final_recommendation`` — ``pass`` if ``overall_confidence >=
-      clearance_threshold`` AND no per-weapon ``high``-risk level; ``conditional``
-      if threshold met but at least one per-weapon ``medium``-risk level exists;
+      clearance_threshold`` AND no per-trial ``high``-risk level; ``conditional``
+      if threshold met but at least one per-trial ``medium``-risk level exists;
       ``block`` otherwise.
     """
 
@@ -339,4 +339,4 @@ class FinalClearance(GauntletModel):
     final_recommendation: Literal["pass", "conditional", "block"]
     rationale: str
     clearance_threshold: float
-    per_weapon_reports: list[WeaponReport]
+    per_trial_reports: list[TrialReport]

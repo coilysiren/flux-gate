@@ -59,10 +59,10 @@ def _finding(issue: str) -> Finding:
 def test_record_then_recurring_surfaces_repeated_issues(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
     for run_id in ("run_1", "run_2", "run_3"):
-        store.record("weapon_a", run_id, _finding("cross_user_patch_allowed"))
-        store.record("weapon_a", run_id, _finding(f"unique_to_{run_id}"))
+        store.record("trial_a", run_id, _finding("cross_user_patch_allowed"))
+        store.record("trial_a", run_id, _finding(f"unique_to_{run_id}"))
 
-    recurring = store.recurring("weapon_a", lookback=5)
+    recurring = store.recurring("trial_a", lookback=5)
     assert len(recurring) == 1
     [entry] = recurring
     assert entry["issue"] == "cross_user_patch_allowed"
@@ -73,9 +73,9 @@ def test_record_then_recurring_surfaces_repeated_issues(tmp_path: Path) -> None:
 def test_recurring_window_respects_lookback(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
     for run_id in ("r1", "r2", "r3", "r4"):
-        store.record("weapon_a", run_id, _finding("flaky_issue"))
+        store.record("trial_a", run_id, _finding("flaky_issue"))
     # With lookback=2, only the two most recent runs are counted.
-    recurring = store.recurring("weapon_a", lookback=2)
+    recurring = store.recurring("trial_a", lookback=2)
     assert len(recurring) == 1
     assert recurring[0]["occurrences"] == 2
     assert recurring[0]["run_ids"] == ["r3", "r4"]
@@ -83,51 +83,51 @@ def test_recurring_window_respects_lookback(tmp_path: Path) -> None:
 
 def test_recurring_returns_empty_when_no_issue_repeats(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
-    store.record("weapon_a", "run_1", _finding("one_off_issue"))
-    store.record("weapon_a", "run_2", _finding("different_issue"))
-    assert store.recurring("weapon_a", lookback=5) == []
+    store.record("trial_a", "run_1", _finding("one_off_issue"))
+    store.record("trial_a", "run_2", _finding("different_issue"))
+    assert store.recurring("trial_a", lookback=5) == []
 
 
 def test_recurring_missing_file_returns_empty(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
-    assert store.recurring("weapon_never_seen", lookback=5) == []
+    assert store.recurring("trial_never_seen", lookback=5) == []
 
 
 def test_recurring_issue_per_run_is_deduped(tmp_path: Path) -> None:
     """Same issue twice within one run is one occurrence, not two."""
     store = FindingsStore(tmp_path)
-    store.record("weapon_a", "run_1", _finding("issue_a"))
-    store.record("weapon_a", "run_1", _finding("issue_a"))
-    store.record("weapon_a", "run_2", _finding("issue_a"))
-    recurring = store.recurring("weapon_a", lookback=5)
+    store.record("trial_a", "run_1", _finding("issue_a"))
+    store.record("trial_a", "run_1", _finding("issue_a"))
+    store.record("trial_a", "run_2", _finding("issue_a"))
+    recurring = store.recurring("trial_a", lookback=5)
     assert recurring[0]["occurrences"] == 2
     assert recurring[0]["run_ids"] == ["run_1", "run_2"]
 
 
-def test_clear_removes_weapon_file(tmp_path: Path) -> None:
+def test_clear_removes_trial_file(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
-    store.record("weapon_a", "run_1", _finding("issue"))
-    assert (tmp_path / "weapon_a.jsonl").exists()
-    store.clear("weapon_a")
-    assert not (tmp_path / "weapon_a.jsonl").exists()
+    store.record("trial_a", "run_1", _finding("issue"))
+    assert (tmp_path / "trial_a.jsonl").exists()
+    store.clear("trial_a")
+    assert not (tmp_path / "trial_a.jsonl").exists()
     # Safe to call on a missing file.
-    store.clear("weapon_a")
+    store.clear("trial_a")
 
 
 def test_record_skips_corrupt_lines_on_read(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     store = FindingsStore(tmp_path)
-    store.record("weapon_a", "run_1", _finding("issue"))
+    store.record("trial_a", "run_1", _finding("issue"))
     # Append a malformed JSON line and a valid one after.
-    path = tmp_path / "weapon_a.jsonl"
+    path = tmp_path / "trial_a.jsonl"
     with path.open("a") as fh:
         fh.write("{not json\n")
         fh.write("null\n")  # valid JSON but not an object
-    store.record("weapon_a", "run_2", _finding("issue"))
+    store.record("trial_a", "run_2", _finding("issue"))
 
     with caplog.at_level(logging.WARNING, logger="gauntlet._findings_store"):
-        recurring = store.recurring("weapon_a", lookback=5)
+        recurring = store.recurring("trial_a", lookback=5)
 
     # The corrupt + non-object lines were skipped; the two valid records show
     # up as a recurring issue across two distinct runs.
@@ -138,7 +138,7 @@ def test_record_skips_corrupt_lines_on_read(
     assert corrupt_warnings
 
 
-def test_record_rejects_invalid_weapon_ids(tmp_path: Path) -> None:
+def test_record_rejects_invalid_trial_ids(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
     for bad in ("", "../escape", "a/b", ".", ".."):
         with pytest.raises(ValueError):
@@ -147,8 +147,8 @@ def test_record_rejects_invalid_weapon_ids(tmp_path: Path) -> None:
 
 def test_record_writes_schema_version_and_timestamp(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
-    store.record("weapon_a", "run_1", _finding("issue"))
-    line = (tmp_path / "weapon_a.jsonl").read_text().strip()
+    store.record("trial_a", "run_1", _finding("issue"))
+    line = (tmp_path / "trial_a.jsonl").read_text().strip()
     entry = json.loads(line)
     assert entry["schema_version"] == 1
     assert entry["run_id"] == "run_1"
@@ -159,12 +159,12 @@ def test_record_writes_schema_version_and_timestamp(tmp_path: Path) -> None:
 def test_sorting_prefers_higher_occurrence_then_issue_name(tmp_path: Path) -> None:
     store = FindingsStore(tmp_path)
     # issue_b appears in 2 runs, issue_a appears in 3 runs.
-    store.record("weapon_a", "run_1", _finding("issue_a"))
-    store.record("weapon_a", "run_2", _finding("issue_a"))
-    store.record("weapon_a", "run_3", _finding("issue_a"))
-    store.record("weapon_a", "run_1", _finding("issue_b"))
-    store.record("weapon_a", "run_2", _finding("issue_b"))
-    recurring = store.recurring("weapon_a", lookback=5)
+    store.record("trial_a", "run_1", _finding("issue_a"))
+    store.record("trial_a", "run_2", _finding("issue_a"))
+    store.record("trial_a", "run_3", _finding("issue_a"))
+    store.record("trial_a", "run_1", _finding("issue_b"))
+    store.record("trial_a", "run_2", _finding("issue_b"))
+    recurring = store.recurring("trial_a", lookback=5)
     assert [r["issue"] for r in recurring] == ["issue_a", "issue_b"]
 
 
@@ -187,13 +187,13 @@ _AUTHZ_PLAN = Plan(
 )
 
 
-def _record_one_run_with_finding(weapon_id: str, issue: str) -> None:
-    out = start_run(weapon_ids=[weapon_id])
+def _record_one_run_with_finding(trial_id: str, issue: str) -> None:
+    out = start_run(trial_ids=[trial_id])
     run_id = out["run_id"]
     execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     record_iteration(
         run_id=run_id,
-        weapon_id=weapon_id,
+        trial_id=trial_id,
         iteration_record=IterationRecord(
             spec=_spec(),
             plans=[_AUTHZ_PLAN],
@@ -205,20 +205,20 @@ def _record_one_run_with_finding(weapon_id: str, issue: str) -> None:
     # but we need at least one holdout so the report reads cleanly.
     record_holdout_result(
         run_id=run_id,
-        weapon_id=weapon_id,
-        holdout_result=HoldoutResult(weapon_id=weapon_id, execution_result=execution),
+        trial_id=trial_id,
+        holdout_result=HoldoutResult(trial_id=trial_id, execution_result=execution),
     )
-    assemble_run_report(run_id=run_id, weapon_id=weapon_id)
+    assemble_run_report(run_id=run_id, trial_id=trial_id)
 
 
 def test_assemble_run_report_persists_findings_for_recurring_failures(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    _record_one_run_with_finding("weapon_a", "cross_user_patch_allowed")
-    _record_one_run_with_finding("weapon_a", "cross_user_patch_allowed")
+    _record_one_run_with_finding("trial_a", "cross_user_patch_allowed")
+    _record_one_run_with_finding("trial_a", "cross_user_patch_allowed")
 
-    recurring = recurring_failures(weapon_id="weapon_a", lookback=5)
+    recurring = recurring_failures(trial_id="trial_a", lookback=5)
     assert len(recurring) == 1
     entry = recurring[0]
     assert entry["issue"] == "cross_user_patch_allowed"
@@ -229,12 +229,12 @@ def test_assemble_run_report_does_not_persist_when_no_findings(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
     execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     record_iteration(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         iteration_record=IterationRecord(
             spec=_spec(),
             plans=[_AUTHZ_PLAN],
@@ -244,27 +244,27 @@ def test_assemble_run_report_does_not_persist_when_no_findings(
     )
     record_holdout_result(
         run_id=run_id,
-        weapon_id="weapon_a",
-        holdout_result=HoldoutResult(weapon_id="weapon_a", execution_result=execution),
+        trial_id="trial_a",
+        holdout_result=HoldoutResult(trial_id="trial_a", execution_result=execution),
     )
-    assemble_run_report(run_id=run_id, weapon_id="weapon_a")
+    assemble_run_report(run_id=run_id, trial_id="trial_a")
 
-    assert recurring_failures(weapon_id="weapon_a", lookback=5) == []
-    # And no per-weapon findings file should have been created.
-    assert not (tmp_path / ".gauntlet" / "findings" / "weapon_a.jsonl").exists()
+    assert recurring_failures(trial_id="trial_a", lookback=5) == []
+    # And no per-trial findings file should have been created.
+    assert not (tmp_path / ".gauntlet" / "findings" / "trial_a.jsonl").exists()
 
 
 def test_assemble_run_report_does_not_persist_anomalies(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
     execution = make_execution_result(plan_name=_AUTHZ_PLAN.name)
     anomaly = _finding("unexplained_500").model_copy(update={"is_anomaly": True})
     record_iteration(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         iteration_record=IterationRecord(
             spec=_spec(),
             plans=[_AUTHZ_PLAN],
@@ -274,22 +274,22 @@ def test_assemble_run_report_does_not_persist_anomalies(
     )
     record_holdout_result(
         run_id=run_id,
-        weapon_id="weapon_a",
-        holdout_result=HoldoutResult(weapon_id="weapon_a", execution_result=execution),
+        trial_id="trial_a",
+        holdout_result=HoldoutResult(trial_id="trial_a", execution_result=execution),
     )
-    assemble_run_report(run_id=run_id, weapon_id="weapon_a")
+    assemble_run_report(run_id=run_id, trial_id="trial_a")
 
     # Anomalies are tracked separately and should not flow into the cross-run store.
-    assert recurring_failures(weapon_id="weapon_a", lookback=5) == []
+    assert recurring_failures(trial_id="trial_a", lookback=5) == []
 
 
 def test_recurring_failures_honors_custom_findings_path(tmp_path: Path) -> None:
     custom = tmp_path / "custom_findings"
-    FindingsStore(custom).record("weapon_a", "run_1", _finding("shared_issue"))
-    FindingsStore(custom).record("weapon_a", "run_2", _finding("shared_issue"))
+    FindingsStore(custom).record("trial_a", "run_1", _finding("shared_issue"))
+    FindingsStore(custom).record("trial_a", "run_2", _finding("shared_issue"))
 
     out = recurring_failures(
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         lookback=5,
         findings_path=str(custom),
     )

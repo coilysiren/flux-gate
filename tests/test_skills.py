@@ -30,7 +30,7 @@ def _read_frontmatter(path: Path) -> dict[str, object]:
     "skill_name, description_substr",
     [
         ("gauntlet", "adversarial"),
-        ("gauntlet-author", "weapon"),
+        ("gauntlet-author", "trial"),
     ],
 )
 def test_skill_frontmatter_present(skill_name: str, description_substr: str) -> None:
@@ -45,7 +45,7 @@ def test_skill_frontmatter_present(skill_name: str, description_substr: str) -> 
 def test_gauntlet_author_skill_documents_train_test_split() -> None:
     """The author skill must explain that description and blockers play different roles.
 
-    If this section disappears, the skill will start authoring weapons whose
+    If this section disappears, the skill will start authoring trials whose
     description gives away the blockers — collapsing the train/test split
     before any run starts.
     """

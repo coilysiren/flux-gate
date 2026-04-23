@@ -56,13 +56,13 @@ def _finding_with_replay_bundle() -> Finding:
 def _record_finding(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, finding: Finding
 ) -> tuple[str, str]:
-    """Start a run, record one iteration carrying ``finding``, return (run_id, weapon_id)."""
+    """Start a run, record one iteration carrying ``finding``, return (run_id, trial_id)."""
     monkeypatch.chdir(tmp_path)
-    out = start_run(weapon_ids=["weapon_a"])
+    out = start_run(trial_ids=["trial_a"])
     run_id = out["run_id"]
     record_iteration(
         run_id=run_id,
-        weapon_id="weapon_a",
+        trial_id="trial_a",
         iteration_record=IterationRecord(
             spec=_spec(),
             plans=[],
@@ -70,13 +70,13 @@ def _record_finding(
             findings=[finding],
         ),
     )
-    return run_id, "weapon_a"
+    return run_id, "trial_a"
 
 
 def test_replay_finding_round_trips_through_fake_http(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    run_id, weapon_id = _record_finding(tmp_path, monkeypatch, _finding_with_replay_bundle())
+    run_id, trial_id = _record_finding(tmp_path, monkeypatch, _finding_with_replay_bundle())
 
     sent: list[tuple[str, str, str]] = []  # (user, method, path)
 
@@ -88,7 +88,7 @@ def test_replay_finding_round_trips_through_fake_http(
 
     result = replay_finding(
         run_id=run_id,
-        weapon_id=weapon_id,
+        trial_id=trial_id,
         finding_index=0,
         url="http://localhost:0",
     )
@@ -113,23 +113,23 @@ def test_replay_finding_without_bundle_raises(
         confidence=0.5,
         rationale="a finding that forgot its bundle",
     )
-    run_id, weapon_id = _record_finding(tmp_path, monkeypatch, bare_finding)
+    run_id, trial_id = _record_finding(tmp_path, monkeypatch, bare_finding)
 
     with pytest.raises(ValueError, match="no replay_bundle"):
         replay_finding(
             run_id=run_id,
-            weapon_id=weapon_id,
+            trial_id=trial_id,
             finding_index=0,
             url="http://localhost:0",
         )
 
 
 def test_replay_finding_index_out_of_range(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    run_id, weapon_id = _record_finding(tmp_path, monkeypatch, _finding_with_replay_bundle())
+    run_id, trial_id = _record_finding(tmp_path, monkeypatch, _finding_with_replay_bundle())
     with pytest.raises(ValueError, match="out of range"):
         replay_finding(
             run_id=run_id,
-            weapon_id=weapon_id,
+            trial_id=trial_id,
             finding_index=5,
             url="http://localhost:0",
         )
@@ -139,7 +139,7 @@ def test_record_iteration_warns_when_replay_bundle_missing(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     store = RunStore(tmp_path)
-    run_id = store.start_run(["weapon_a"])
+    run_id = store.start_run(["trial_a"])
     bare_finding = Finding(
         issue="no_bundle_finding",
         severity="low",
@@ -154,12 +154,12 @@ def test_record_iteration_warns_when_replay_bundle_missing(
     )
 
     with caplog.at_level(logging.WARNING, logger="gauntlet.runs"):
-        store.record_iteration(run_id, "weapon_a", record)
+        store.record_iteration(run_id, "trial_a", record)
 
     messages = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
     assert any("replay_bundle" in m for m in messages)
     assert any(run_id in m for m in messages)
-    assert any("weapon_a" in m for m in messages)
+    assert any("trial_a" in m for m in messages)
     assert any("no_bundle_finding" in m for m in messages)
 
 
@@ -167,7 +167,7 @@ def test_record_iteration_does_not_warn_when_replay_bundle_present(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     store = RunStore(tmp_path)
-    run_id = store.start_run(["weapon_a"])
+    run_id = store.start_run(["trial_a"])
     record = IterationRecord(
         spec=_spec(),
         plans=[],
@@ -176,7 +176,7 @@ def test_record_iteration_does_not_warn_when_replay_bundle_present(
     )
 
     with caplog.at_level(logging.WARNING, logger="gauntlet.runs"):
-        store.record_iteration(run_id, "weapon_a", record)
+        store.record_iteration(run_id, "trial_a", record)
 
     replay_warnings = [r for r in caplog.records if "replay_bundle" in r.getMessage()]
     assert replay_warnings == []
