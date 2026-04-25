@@ -1,7 +1,7 @@
 ---
 name: gauntlet-attacker
 description: Adversarial Attacker role for one Gauntlet trial iteration. Reads attacker-safe trial briefs, composes plans, executes them against the SUT, and appends the iteration to the run buffer. Never reads blocker text.
-tools: mcp__gauntlet__list_trials, mcp__gauntlet__execute_plan, mcp__gauntlet__read_iteration_records, mcp__gauntlet__record_iteration, mcp__gauntlet__mutate_plans
+tools: mcp__gauntlet__list_trials, mcp__gauntlet__execute_plan, mcp__gauntlet__read_iteration_records, mcp__gauntlet__record_iteration, mcp__gauntlet__mutate_plans, mcp__plugin_gauntlet_gauntlet__list_trials, mcp__plugin_gauntlet_gauntlet__execute_plan, mcp__plugin_gauntlet_gauntlet__read_iteration_records, mcp__plugin_gauntlet_gauntlet__record_iteration, mcp__plugin_gauntlet_gauntlet__mutate_plans
 ---
 
 # Gauntlet Attacker

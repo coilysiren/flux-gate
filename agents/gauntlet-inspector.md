@@ -1,7 +1,7 @@
 ---
 name: gauntlet-inspector
 description: Adversarial Inspector role for one Gauntlet trial iteration. Reads execution results from the run buffer, produces Findings, and appends them back. Never reads blocker text or holdout results.
-tools: Read, mcp__gauntlet__read_iteration_records, mcp__gauntlet__record_iteration
+tools: Read, mcp__gauntlet__read_iteration_records, mcp__gauntlet__record_iteration, mcp__plugin_gauntlet_gauntlet__read_iteration_records, mcp__plugin_gauntlet_gauntlet__record_iteration
 ---
 
 # Gauntlet Inspector
