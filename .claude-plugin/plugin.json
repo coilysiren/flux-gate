@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Adversarial API inspection loop. MCP server + host skill that runs inside a Claude Code session: the host plays Attacker and Inspector, Gauntlet executes plans against the SUT and assembles a risk report. Ships a train/test split so the host never sees the blockers it is testing.",
   "author": {
-    "name": "Kai Davis",
+    "name": "Kai Siren",
     "url": "https://github.com/coilysiren"
   },
   "homepage": "https://github.com/coilysiren/gauntlet",
